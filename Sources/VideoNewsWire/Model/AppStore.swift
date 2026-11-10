@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -7,6 +8,9 @@ final class AppStore {
     static let shared = AppStore()
 
     private(set) var channels: [Channel] = []
+    private(set) var folders: [Folder] = []
+    /// Lokal gespeicherte Kanalbilder (Kanal-ID → Bild).
+    private(set) var avatars: [String: NSImage] = AvatarService.loadAll()
     private(set) var videos: [String: Video] = [:]
     private(set) var states: [String: VideoState] = [:]
 
@@ -16,10 +20,12 @@ final class AppStore {
     private(set) var lastRefresh: Date? = UserDefaults.standard.object(forKey: Prefs.lastRefresh) as? Date
 
     var showingAddChannel = false
+    var showingNewFolder = false
     var errorMessage: String?
 
     private struct Library: Codable {
         var channels: [Channel]
+        var folders: [Folder]?   // optional: ältere Bibliotheken haben noch keine Ordner
         var videos: [Video]
         var states: [String: VideoState]
     }
@@ -38,6 +44,7 @@ final class AppStore {
         decoder.dateDecodingStrategy = .iso8601
         guard let library = try? decoder.decode(Library.self, from: data) else { return }
         channels = library.channels
+        folders = library.folders ?? []
         videos = Dictionary(library.videos.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
         states = library.states
         sortChannels()
@@ -46,7 +53,7 @@ final class AppStore {
     func save() {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        let library = Library(channels: channels, videos: Array(videos.values), states: states)
+        let library = Library(channels: channels, folders: folders, videos: Array(videos.values), states: states)
         do {
             try FileManager.default.createDirectory(at: libraryURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try encoder.encode(library).write(to: libraryURL, options: .atomic)
@@ -92,6 +99,9 @@ final class AppStore {
             list = list.filter { state($0.id).saved }
         case .smart(.downloaded):
             list = list.filter { state($0.id).localFile != nil }
+        case .folder(let folderID):
+            let ids = Set(channels.filter { $0.folderID == folderID }.map(\.id))
+            list = list.filter { ids.contains($0.channelID) }
         case .channel(let id):
             list = list.filter { $0.channelID == id }
         }
@@ -137,6 +147,39 @@ final class AppStore {
         UserDefaults.standard.set(lastRefresh, forKey: Prefs.lastRefresh)
         isRefreshing = false
         save()
+        await refreshAvatars()
+    }
+
+    // MARK: Kanalbilder
+
+    /// Lädt fehlende Kanalbilder und erneuert sie alle 30 Tage.
+    func refreshAvatars() async {
+        let maxAge: TimeInterval = 30 * 24 * 3600
+        let due = channels
+            .filter { avatars[$0.id] == nil || Date().timeIntervalSince($0.avatarUpdated ?? .distantPast) > maxAge }
+            .map(\.id)
+        guard !due.isEmpty else { return }
+
+        await withTaskGroup(of: (String, Data?).self) { group in
+            var iterator = due.makeIterator()
+            for _ in 0..<min(4, due.count) {
+                if let id = iterator.next() {
+                    group.addTask { (id, try? await AvatarService.download(channelID: id)) }
+                }
+            }
+            while let finished = await group.next() {
+                let (id, data) = finished
+                if let data, let image = NSImage(data: data),
+                   let index = channels.firstIndex(where: { $0.id == id }) {
+                    avatars[id] = image
+                    channels[index].avatarUpdated = Date()
+                }
+                if let nextID = iterator.next() {
+                    group.addTask { (nextID, try? await AvatarService.download(channelID: nextID)) }
+                }
+            }
+        }
+        save()
     }
 
     private func apply(_ channelID: String, _ result: Result<FeedService.Feed, Error>) {
@@ -178,6 +221,7 @@ final class AppStore {
         merge(feed.videos, initialFetch: true)
         sortChannels()
         save()
+        Task { await refreshAvatars() }
         return channel
     }
 
@@ -214,6 +258,8 @@ final class AppStore {
 
     func removeChannel(_ id: String) {
         channels.removeAll { $0.id == id }
+        avatars[id] = nil
+        AvatarService.delete(channelID: id)
         // Gemerkte und heruntergeladene Videos bleiben erhalten.
         for video in videos.values where video.channelID == id {
             let state = state(video.id)
@@ -223,6 +269,63 @@ final class AppStore {
             }
         }
         save()
+    }
+
+    // MARK: Ordner
+
+    func channels(inFolder folderID: UUID?) -> [Channel] {
+        channels.filter { $0.folderID == folderID }
+    }
+
+    @discardableResult
+    func createFolder(named name: String) -> Folder? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let existing = folders.first(where: { $0.name.localizedCaseInsensitiveCompare(trimmed) == .orderedSame }) {
+            return existing
+        }
+        let folder = Folder(name: trimmed)
+        folders.append(folder)
+        sortFolders()
+        save()
+        return folder
+    }
+
+    func renameFolder(_ id: UUID, to name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = folders.firstIndex(where: { $0.id == id }) else { return }
+        folders[index].name = trimmed
+        sortFolders()
+        save()
+    }
+
+    /// Löscht den Ordner; die enthaltenen Kanäle bleiben abonniert (ohne Ordner).
+    func deleteFolder(_ id: UUID) {
+        folders.removeAll { $0.id == id }
+        for index in channels.indices where channels[index].folderID == id {
+            channels[index].folderID = nil
+        }
+        save()
+    }
+
+    func setFolder(_ id: UUID, expanded: Bool) {
+        guard let index = folders.firstIndex(where: { $0.id == id }) else { return }
+        folders[index].isExpanded = expanded
+        save()
+    }
+
+    func moveChannel(_ channelID: String, toFolder folderID: UUID?) {
+        guard let index = channels.firstIndex(where: { $0.id == channelID }) else { return }
+        channels[index].folderID = folderID
+        save()
+    }
+
+    func folder(_ id: UUID) -> Folder? {
+        folders.first { $0.id == id }
+    }
+
+    private func sortFolders() {
+        folders.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private func sortChannels() {

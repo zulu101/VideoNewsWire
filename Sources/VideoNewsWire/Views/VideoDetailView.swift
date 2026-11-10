@@ -28,8 +28,11 @@ struct VideoDetailView: View {
                     Text(video.title)
                         .font(.title2.bold())
                         .textSelection(.enabled)
-                    Text("\(video.channelTitle) · \(video.published.formatted(date: .long, time: .shortened))")
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        ChannelIcon(channelID: video.channelID, size: 18)
+                        Text("\(video.channelTitle) · \(video.published.formatted(date: .long, time: .shortened))")
+                    }
+                    .foregroundStyle(.secondary)
                 }
 
                 actionBar(state)

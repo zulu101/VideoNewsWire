@@ -21,6 +21,8 @@ struct VideoNewsWireApp: App {
             CommandGroup(replacing: .newItem) {
                 Button("Kanal hinzufügen…") { store.showingAddChannel = true }
                     .keyboardShortcut("n")
+                Button("Neuer Ordner…") { store.showingNewFolder = true }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
             }
             CommandMenu("Videos") {
                 Button("Alle Kanäle aktualisieren") {

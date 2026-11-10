@@ -24,7 +24,7 @@ struct VideoListView: View {
             if items.isEmpty { emptyState }
         }
         .navigationTitle(title)
-        .searchable(text: $searchText, prompt: "Titel durchsuchen")
+        .searchable(text: $searchText, prompt: "Titel, Beschreibung, Kanal")
         .toolbar {
             ToolbarItem {
                 Button("Alle als gesehen markieren", systemImage: "checkmark.circle") {
@@ -38,10 +38,17 @@ struct VideoListView: View {
 
     private var filteredVideos: [Video] {
         let list = store.videos(for: selection, hideShorts: hideShorts, keeping: selectedVideoID)
-        guard !searchText.isEmpty else { return list }
-        return list.filter {
-            $0.title.localizedCaseInsensitiveContains(searchText)
-                || $0.channelTitle.localizedCaseInsensitiveContains(searchText)
+        // Mehrere Suchbegriffe müssen alle vorkommen (in Titel, Kanal, Beschreibung oder KI-Zusammenfassung).
+        let terms = searchText.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !terms.isEmpty else { return list }
+        return list.filter { video in
+            let summary = store.state(video.id).aiSummary ?? ""
+            return terms.allSatisfy { term in
+                video.title.localizedStandardContains(term)
+                    || video.channelTitle.localizedStandardContains(term)
+                    || video.descriptionText.localizedStandardContains(term)
+                    || summary.localizedStandardContains(term)
+            }
         }
     }
 
@@ -53,6 +60,7 @@ struct VideoListView: View {
     private var title: String {
         switch selection {
         case .smart(let feed): feed.title
+        case .folder(let id): store.folder(id)?.name ?? "Ordner"
         case .channel(let id): store.channel(id)?.title ?? "Kanal"
         }
     }
@@ -128,6 +136,7 @@ struct VideoRow: View {
                     .lineLimit(2)
                 HStack(spacing: 4) {
                     if showChannel {
+                        ChannelIcon(channelID: video.channelID, size: 12)
                         Text(video.channelTitle)
                         Text("·")
                     }

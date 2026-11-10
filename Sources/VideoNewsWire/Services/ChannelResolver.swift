@@ -38,7 +38,8 @@ enum ChannelResolver {
         return url
     }
 
-    private static func scrape(_ url: URL) async throws -> String? {
+    /// Lädt eine YouTube-Seite als HTML (ohne EU-Cookie-Einwilligungsseite).
+    nonisolated static func fetchPage(_ url: URL) async throws -> String {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.httpShouldHandleCookies = false
@@ -47,8 +48,16 @@ enum ChannelResolver {
         request.setValue("de-DE,de;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
                          forHTTPHeaderField: "User-Agent")
-        let (data, _) = try await URLSession.shared.data(for: request)
-        guard let html = String(data: data, encoding: .utf8) else { return nil }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw AppError("Seite nicht erreichbar (HTTP \(http.statusCode)).")
+        }
+        guard let html = String(data: data, encoding: .utf8) else { throw AppError("Seite konnte nicht gelesen werden.") }
+        return html
+    }
+
+    private static func scrape(_ url: URL) async throws -> String? {
+        let html = try await fetchPage(url)
 
         let patterns: [Regex<(Substring, Substring)>] = [
             #/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})"/#,

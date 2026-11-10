@@ -6,10 +6,25 @@ struct Channel: Codable, Identifiable, Hashable {
     var title: String
     var lastRefreshed: Date? = nil
     var lastError: String? = nil
+    /// Ordner, in dem der Kanal einsortiert ist (`nil` = ohne Ordner).
+    var folderID: UUID? = nil
+    /// Wann das Kanalbild zuletzt geladen wurde.
+    var avatarUpdated: Date? = nil
 
     var feedURL: URL {
         URL(string: "https://www.youtube.com/feeds/videos.xml?channel_id=\(id)")!
     }
+
+    var pageURL: URL {
+        URL(string: "https://www.youtube.com/channel/\(id)")!
+    }
+}
+
+/// Ordner zum Gruppieren von Abos (z. B. „Food“, „Tech“).
+struct Folder: Codable, Identifiable, Hashable {
+    var id = UUID()
+    var name: String
+    var isExpanded = true
 }
 
 /// Ein Video aus dem RSS-Feed eines Kanals.
@@ -58,6 +73,7 @@ enum SmartFeed: String, CaseIterable, Hashable {
 
 enum SidebarSelection: Hashable {
     case smart(SmartFeed)
+    case folder(UUID)
     case channel(String)
 }
 

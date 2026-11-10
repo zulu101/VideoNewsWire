@@ -6,8 +6,10 @@ Ein ruhiger YouTube-Client für macOS – aufgebaut wie [NetNewsWire](https://ne
 
 | Bereich | Umsetzung |
 |---|---|
-| **Seitenleiste** | Übersicht (Neu · Heute · Merkliste · Downloads) und alle abonnierten Kanäle |
-| **Videoliste** | Neueste Videos pro Kanal aus den öffentlichen YouTube-RSS-Feeds, Suche, „Alle als gesehen markieren“ |
+| **Seitenleiste** | Übersicht (Neu · Heute · Merkliste · Downloads), **Ordner** (z. B. Food, Tech) und alle abonnierten Kanäle mit ihrem **Kanalbild** |
+| **Ordner** | ⇧⌘N oder Rechtsklick → „Neuer Ordner…“; Kanäle per Drag & Drop oder Kontextmenü einsortieren; Klick auf den Ordner zeigt alle Videos seiner Kanäle |
+| **Videoliste** | Neueste Videos pro Kanal aus den öffentlichen YouTube-RSS-Feeds, „Alle als gesehen markieren“ |
+| **Suche** | Durchsucht Titel, Kanalname, **Videobeschreibung** und vorhandene KI-Zusammenfassungen; mehrere Wörter müssen alle vorkommen |
 | **Player** | Eingebettet über `youtube-nocookie.com`; Endscreens, Info-Karten, Pause-Empfehlungen, YouTube-Logo-Link usw. per CSS ausgeblendet; Navigation aus dem Player heraus blockiert |
 | **KI-Zusammenfassung** | Auf Knopfdruck, **on-device mit Apple Foundation Models** (Apple Intelligence). Grundlage: Untertitel/Transkript via yt-dlp, ersatzweise die Videobeschreibung. Lange Videos werden abschnittsweise verdichtet (Map-Reduce), weil das lokale Modell nur ca. 4 096 Tokens Kontext hat |
 | **Download** | Über yt-dlp; die App installiert und **aktualisiert yt-dlp selbst** (alle 3 Tage beim Start oder manuell). Heruntergeladene Videos werden lokal mit AVKit abgespielt |
@@ -71,6 +73,7 @@ Sources/VideoNewsWire/
 ├── Services/
 │   ├── FeedService.swift       YouTube-RSS laden & parsen
 │   ├── ChannelResolver.swift   @Handle/URL → Kanal-ID
+│   ├── AvatarService.swift     Kanalbilder laden & lokal speichern
 │   ├── YTDLPManager.swift      yt-dlp installieren/aktualisieren, Download, Untertitel, Konto-Abos
 │   ├── ProcessRunner.swift     externe Prozesse asynchron ausführen
 │   └── Summarizer.swift        Zusammenfassung mit FoundationModels (Map-Reduce)
@@ -83,4 +86,5 @@ Sources/VideoNewsWire/
 - YouTube-Feeds sind gelegentlich kurzzeitig nicht erreichbar; betroffene Kanäle zeigen ein ⚠️ in der Seitenleiste.
 - Das Ausblenden von Player-Elementen hängt von YouTubes CSS-Klassen ab und kann nach Änderungen bei YouTube Nachbesserung brauchen.
 - Viele Untertitel-Abrufe in kurzer Zeit können von YouTube gedrosselt werden (HTTP 429).
+- Kanalbilder werden von der Kanalseite gelesen (`og:image`), lokal gespeichert und alle 30 Tage erneuert.
 - Zusammenfassungen sind auf Deutsch; die Qualität des lokalen Modells ist gut für Überblicke, aber nicht fehlerfrei.
