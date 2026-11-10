@@ -55,6 +55,16 @@ Jeder Push baut die App außerdem per GitHub Actions (`macos-26`-Runner); das fe
 xattr -dr com.apple.quarantine VideoNewsWire.app
 ```
 
+## App-Icon
+
+Quelle ist `Resources/AppIcon.svg` (entworfen in Claude Design, Konzept „Zeitung & Play“). Nach Änderungen am SVG neu erzeugen:
+
+```bash
+node Scripts/make-icon.mjs   # schreibt Resources/AppIcon.icns und PNGs nach Resources/AppIcon.iconset/
+```
+
+Das Skript braucht Playwright mit Chromium (`npm i -g playwright && npx playwright install chromium`).
+
 ## Erste Schritte
 
 1. **Einstellungen → Downloads → „yt-dlp installieren“** (für Downloads, Transkripte und den Konto-Import).

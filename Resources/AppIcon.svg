@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
+  <!-- VideoNewsWire App-Icon (Konzept B „Zeitung & Play“, angepasste Farben).
+       macOS-Raster: 824 × 824 px Grundform in 1024 × 1024 px Fläche. -->
+  <defs>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#1A1F26" flood-opacity="0.32"/>
+    </filter>
+    <filter id="sh2" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#1A1F26" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="50" y="50" width="412" height="412" rx="92" fill="#4A5563" filter="url(#sh)"/>
+  <g transform="rotate(-6 236 236)">
+    <rect x="116" y="112" width="240" height="280" rx="18" fill="#FFFFFF" filter="url(#sh2)"/>
+    <rect x="144" y="144" width="184" height="26" rx="8" fill="#22303F"/>
+    <rect x="144" y="190" width="88" height="70" rx="8" fill="#D9DEE4"/>
+    <rect x="246" y="192" width="82" height="12" rx="6" fill="#B8C0CA"/>
+    <rect x="246" y="216" width="82" height="12" rx="6" fill="#B8C0CA"/>
+    <rect x="246" y="240" width="60" height="12" rx="6" fill="#B8C0CA"/>
+    <rect x="144" y="280" width="184" height="12" rx="6" fill="#B8C0CA"/>
+    <rect x="144" y="304" width="160" height="12" rx="6" fill="#B8C0CA"/>
+    <rect x="144" y="328" width="120" height="12" rx="6" fill="#B8C0CA"/>
+  </g>
+  <circle cx="338" cy="338" r="82" fill="#B2121F" filter="url(#sh2)"/>
+  <path d="M318 300 L374 338 L318 376 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="14" stroke-linejoin="round"/>
+</svg>
