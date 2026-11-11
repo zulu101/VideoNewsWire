@@ -4,6 +4,10 @@ A calm YouTube client for macOS, laid out like [NetNewsWire](https://netnewswire
 
 ![App icon](Resources/AppIcon.iconset/icon_128.png)
 
+
+<img width="1370" height="829" alt="Bildschirmfoto 2026-11-11 um 13 53 25" src="https://github.com/user-attachments/assets/af20300a-805a-4078-9572-9622ed5ef89e" />
+
+
 ## Installation
 
 1. Download the latest `VideoNewsWire-x.y.z.zip` from [**Releases**](https://github.com/zulu101/VideoNewsWire/releases/latest).
