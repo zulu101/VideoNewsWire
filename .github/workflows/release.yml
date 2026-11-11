@@ -1,0 +1,38 @@
+name: Release
+
+# Creates a GitHub release with the built app whenever a version tag is pushed:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build app
+        run: ./Scripts/build-app.sh
+
+      - name: Zip app
+        run: ditto -c -k --keepParent build/VideoNewsWire.app "build/VideoNewsWire-${VERSION}.zip"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/VideoNewsWire-${{ env.VERSION }}.zip
+          generate_release_notes: true
+          body: |
+            **Installation:** Download the ZIP, unzip it and drag `VideoNewsWire.app` into your Applications folder.
+            The app is not notarized. Before the first launch, run this once in Terminal:
+            `xattr -dr com.apple.quarantine /Applications/VideoNewsWire.app`
+
+            Requires macOS 26 on Apple silicon. See the README for details.
