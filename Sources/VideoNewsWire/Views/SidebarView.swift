@@ -8,6 +8,25 @@ struct SidebarView: View {
 
     @State private var prompt: FolderPrompt?
     @State private var folderName = ""
+    /// Zeile, über der gerade etwas per Drag & Drop schwebt (für die Hervorhebung).
+    @State private var dropTarget: String?
+
+    /// Inhalt eines Drags in der Seitenleiste: Kanal oder Ordner.
+    enum DragItem {
+        case channel(String)
+        case folder(UUID)
+
+        init?(_ string: String) {
+            if string.hasPrefix("folder:") {
+                guard let id = UUID(uuidString: String(string.dropFirst(7))) else { return nil }
+                self = .folder(id)
+            } else {
+                let id = string.hasPrefix("channel:") ? String(string.dropFirst(8)) : string
+                guard ChannelResolver.isChannelID(id) else { return nil }
+                self = .channel(id)
+            }
+        }
+    }
 
     /// Eingabedialog zum Anlegen oder Umbenennen eines Ordners.
     enum FolderPrompt: Identifiable {
@@ -42,9 +61,11 @@ struct SidebarView: View {
                         Label(folder.name, systemImage: "folder")
                             .badge(count(.folder(folder.id)))
                             .tag(SidebarSelection.folder(folder.id))
-                            .dropDestination(for: String.self) { ids, _ in
-                                move(ids, to: folder.id)
-                            }
+                            .draggable("folder:\(folder.id.uuidString)")
+                            .dropDestination(for: String.self) { items, _ in
+                                dropOnFolder(items, folder: folder.id)
+                            } isTargeted: { highlight("folder:\(folder.id)", $0) }
+                            .background(dropHighlight("folder:\(folder.id)"))
                             .contextMenu { folderMenu(folder) }
                     }
                 }
@@ -54,15 +75,17 @@ struct SidebarView: View {
                 }
             } header: {
                 Text("Abonnements")
-                    // Kanal auf die Überschrift ziehen = aus dem Ordner nehmen.
-                    .dropDestination(for: String.self) { ids, _ in
-                        move(ids, to: nil)
-                    }
+                    // Auf die Überschrift ziehen = ganz nach oben (Kanäle: ohne Ordner).
+                    .dropDestination(for: String.self) { items, _ in
+                        dropOnHeader(items)
+                    } isTargeted: { highlight("header", $0) }
+                    .background(dropHighlight("header"))
             }
         }
         .listStyle(.sidebar)
         .contextMenu {
             Button("Neuer Ordner…") { askForNewFolder() }
+            Button("Alphabetisch sortieren") { store.sortAlphabetically() }
         }
         .safeAreaInset(edge: .bottom) {
             statusLine
@@ -106,7 +129,11 @@ struct SidebarView: View {
         }
         .badge(count(.channel(channel.id)))
         .tag(SidebarSelection.channel(channel.id))
-        .draggable(channel.id)
+        .draggable("channel:\(channel.id)")
+        .dropDestination(for: String.self) { items, _ in
+            dropOnChannel(items, target: channel.id)
+        } isTargeted: { highlight("channel:\(channel.id)", $0) }
+        .background(dropHighlight("channel:\(channel.id)"))
         .contextMenu { channelMenu(channel) }
     }
 
@@ -123,6 +150,8 @@ struct SidebarView: View {
             Divider()
             Button("Neuer Ordner…") { askForNewFolder(moving: channel.id) }
         }
+        Button("Nach oben") { store.nudgeChannel(channel.id, by: -1) }
+        Button("Nach unten") { store.nudgeChannel(channel.id, by: 1) }
         Button("Alle als gesehen markieren") {
             store.markWatched(store.videos(for: .channel(channel.id), hideShorts: false).map(\.id))
         }
@@ -141,6 +170,8 @@ struct SidebarView: View {
         Button("Alle als gesehen markieren") {
             store.markWatched(store.videos(for: .folder(folder.id), hideShorts: false).map(\.id))
         }
+        Button("Nach oben") { store.nudgeFolder(folder.id, by: -1) }
+        Button("Nach unten") { store.nudgeFolder(folder.id, by: 1) }
         Divider()
         Button("Neuer Ordner…") { askForNewFolder() }
         Button("Ordner löschen (Abos bleiben erhalten)", role: .destructive) {
@@ -173,10 +204,66 @@ struct SidebarView: View {
         )
     }
 
-    private func move(_ ids: [String], to folderID: UUID?) -> Bool {
-        let channelIDs = ids.filter { store.channel($0) != nil }
-        for id in channelIDs { store.moveChannel(id, toFolder: folderID) }
-        return !channelIDs.isEmpty
+    // MARK: Drag & Drop
+
+    /// Kanal auf Kanal: an dessen Stelle (und in dessen Ordner) setzen.
+    private func dropOnChannel(_ items: [String], target: String) -> Bool {
+        var handled = false
+        for case .channel(let id) in items.compactMap(DragItem.init) where store.channel(id) != nil {
+            store.moveChannel(id, onto: target)
+            handled = true
+        }
+        return handled
+    }
+
+    /// Kanal auf Ordner: hinein (ans Ende). Ordner auf Ordner: an dessen Stelle.
+    private func dropOnFolder(_ items: [String], folder: UUID) -> Bool {
+        var handled = false
+        for item in items.compactMap(DragItem.init) {
+            switch item {
+            case .channel(let id) where store.channel(id) != nil:
+                store.moveChannel(id, toFolder: folder)
+                handled = true
+            case .folder(let id):
+                store.moveFolder(id, onto: folder)
+                handled = true
+            default:
+                break
+            }
+        }
+        return handled
+    }
+
+    /// Auf die Überschrift: Ordner ganz nach oben, Kanäle ohne Ordner ganz nach oben.
+    private func dropOnHeader(_ items: [String]) -> Bool {
+        var handled = false
+        for item in items.compactMap(DragItem.init) {
+            switch item {
+            case .channel(let id) where store.channel(id) != nil:
+                store.moveChannel(id, toFolder: nil, atTop: true)
+                handled = true
+            case .folder(let id):
+                store.moveFolderToTop(id)
+                handled = true
+            default:
+                break
+            }
+        }
+        return handled
+    }
+
+    private func highlight(_ key: String, _ isTargeted: Bool) {
+        if isTargeted {
+            dropTarget = key
+        } else if dropTarget == key {
+            dropTarget = nil
+        }
+    }
+
+    private func dropHighlight(_ key: String) -> some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color.accentColor.opacity(dropTarget == key ? 0.22 : 0))
+            .padding(.horizontal, -4)
     }
 
     private func askForNewFolder(moving channelID: String? = nil) {

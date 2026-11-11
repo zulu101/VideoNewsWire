@@ -8,6 +8,7 @@ Ein ruhiger YouTube-Client für macOS – aufgebaut wie [NetNewsWire](https://ne
 |---|---|
 | **Seitenleiste** | Übersicht (Neu · Heute · Merkliste · Downloads), **Ordner** (z. B. Food, Tech) und alle abonnierten Kanäle mit ihrem **Kanalbild** |
 | **Ordner** | ⇧⌘N oder Rechtsklick → „Neuer Ordner…“; Kanäle per Drag & Drop oder Kontextmenü einsortieren; Klick auf den Ordner zeigt alle Videos seiner Kanäle |
+| **Eigene Reihenfolge** | Kanäle und Ordner per Drag & Drop anordnen (auf eine Zeile ziehen = an deren Stelle; auf „Abonnements“ = ganz nach oben) oder per Rechtsklick „Nach oben/unten“. Einmalig alphabetisch sortieren: Rechtsklick → „Alphabetisch sortieren“ |
 | **Videoliste** | Neueste Videos pro Kanal aus den öffentlichen YouTube-RSS-Feeds, „Alle als gesehen markieren“ |
 | **Suche** | Durchsucht Titel, Kanalname, **Videobeschreibung** und vorhandene KI-Zusammenfassungen; mehrere Wörter müssen alle vorkommen |
 | **Player** | Eingebettet über `youtube-nocookie.com`; Endscreens, Info-Karten, Pause-Empfehlungen, YouTube-Logo-Link usw. per CSS ausgeblendet; Navigation aus dem Player heraus blockiert |

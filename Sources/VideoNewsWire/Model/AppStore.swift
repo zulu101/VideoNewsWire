@@ -47,7 +47,6 @@ final class AppStore {
         folders = library.folders ?? []
         videos = Dictionary(library.videos.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
         states = library.states
-        sortChannels()
     }
 
     func save() {
@@ -142,7 +141,6 @@ final class AppStore {
             }
         }
 
-        sortChannels()
         lastRefresh = Date()
         UserDefaults.standard.set(lastRefresh, forKey: Prefs.lastRefresh)
         isRefreshing = false
@@ -219,7 +217,6 @@ final class AppStore {
         let channel = Channel(id: id, title: feed.channelTitle.isEmpty ? id : feed.channelTitle, lastRefreshed: Date())
         channels.append(channel)
         merge(feed.videos, initialFetch: true)
-        sortChannels()
         save()
         Task { await refreshAvatars() }
         return channel
@@ -234,7 +231,6 @@ final class AppStore {
             added += 1
         }
         guard added > 0 else { return 0 }
-        sortChannels()
         save()
         await refreshAll()
         return added
@@ -286,7 +282,6 @@ final class AppStore {
         }
         let folder = Folder(name: trimmed)
         folders.append(folder)
-        sortFolders()
         save()
         return folder
     }
@@ -295,7 +290,6 @@ final class AppStore {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let index = folders.firstIndex(where: { $0.id == id }) else { return }
         folders[index].name = trimmed
-        sortFolders()
         save()
     }
 
@@ -314,9 +308,78 @@ final class AppStore {
         save()
     }
 
-    func moveChannel(_ channelID: String, toFolder folderID: UUID?) {
+    // MARK: Reihenfolge
+    //
+    // Die Reihenfolge in der Seitenleiste entspricht der Reihenfolge der Arrays `channels`
+    // und `folders` – sie wird nur noch durch den Nutzer verändert (Drag & Drop, Menü).
+
+    /// Verschiebt einen Kanal in einen Ordner (`nil` = ohne Ordner) – ans Ende oder an den Anfang.
+    func moveChannel(_ channelID: String, toFolder folderID: UUID?, atTop: Bool = false) {
         guard let index = channels.firstIndex(where: { $0.id == channelID }) else { return }
-        channels[index].folderID = folderID
+        var channel = channels.remove(at: index)
+        channel.folderID = folderID
+        if atTop, let first = channels.firstIndex(where: { $0.folderID == folderID }) {
+            channels.insert(channel, at: first)
+        } else if !atTop, let last = channels.lastIndex(where: { $0.folderID == folderID }) {
+            channels.insert(channel, at: last + 1)
+        } else {
+            channels.insert(channel, at: atTop ? 0 : channels.count)
+        }
+        save()
+    }
+
+    /// Setzt einen Kanal an die Stelle eines anderen (übernimmt dessen Ordner).
+    /// Nach unten gezogen landet er hinter dem Ziel, nach oben gezogen davor.
+    func moveChannel(_ channelID: String, onto targetID: String) {
+        guard channelID != targetID,
+              let from = channels.firstIndex(where: { $0.id == channelID }),
+              let to = channels.firstIndex(where: { $0.id == targetID }) else { return }
+        let target = channels[to]
+        let movingDown = channels[from].folderID == target.folderID && from < to
+        var channel = channels.remove(at: from)
+        channel.folderID = target.folderID
+        guard let newTo = channels.firstIndex(where: { $0.id == targetID }) else { return }
+        channels.insert(channel, at: movingDown ? newTo + 1 : newTo)
+        save()
+    }
+
+    /// Verschiebt einen Kanal innerhalb seiner Gruppe um eine Position nach oben (-1) oder unten (+1).
+    func nudgeChannel(_ channelID: String, by offset: Int) {
+        guard let channel = channel(channelID) else { return }
+        let group = channels(inFolder: channel.folderID)
+        guard let position = group.firstIndex(where: { $0.id == channelID }),
+              group.indices.contains(position + offset) else { return }
+        moveChannel(channelID, onto: group[position + offset].id)
+    }
+
+    /// Setzt einen Ordner an die Stelle eines anderen.
+    func moveFolder(_ folderID: UUID, onto targetID: UUID) {
+        guard folderID != targetID,
+              let from = folders.firstIndex(where: { $0.id == folderID }),
+              let to = folders.firstIndex(where: { $0.id == targetID }) else { return }
+        // Nach unten gezogen landet der Ordner hinter dem Ziel, nach oben gezogen davor.
+        let folder = folders.remove(at: from)
+        folders.insert(folder, at: to)
+        save()
+    }
+
+    func nudgeFolder(_ folderID: UUID, by offset: Int) {
+        guard let position = folders.firstIndex(where: { $0.id == folderID }),
+              folders.indices.contains(position + offset) else { return }
+        folders.swapAt(position, position + offset)
+        save()
+    }
+
+    func moveFolderToTop(_ folderID: UUID) {
+        guard let index = folders.firstIndex(where: { $0.id == folderID }) else { return }
+        folders.insert(folders.remove(at: index), at: 0)
+        save()
+    }
+
+    /// Einmalig alphabetisch sortieren (Ordner, und Kanäle innerhalb jeder Gruppe).
+    func sortAlphabetically() {
+        folders.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        channels.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         save()
     }
 
@@ -324,13 +387,6 @@ final class AppStore {
         folders.first { $0.id == id }
     }
 
-    private func sortFolders() {
-        folders.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-    }
-
-    private func sortChannels() {
-        channels.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-    }
 
     // MARK: Downloads
 
