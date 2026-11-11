@@ -57,6 +57,10 @@ struct SidebarView: View {
                         ForEach(store.channels(inFolder: folder.id)) { channel in
                             channelRow(channel)
                         }
+                        // Einfüge-Linie zwischen den Kanälen dieses Ordners.
+                        .dropDestination(for: String.self) { items, index in
+                            insertChannels(items, folder: folder.id, at: index)
+                        }
                     } label: {
                         Label(folder.name, systemImage: "folder")
                             .badge(count(.folder(folder.id)))
@@ -69,17 +73,20 @@ struct SidebarView: View {
                             .contextMenu { folderMenu(folder) }
                     }
                 }
+                // Einfüge-Linie zwischen den Ordnern.
+                .dropDestination(for: String.self) { items, index in
+                    insertFolders(items, at: index)
+                }
 
                 ForEach(store.channels(inFolder: nil)) { channel in
                     channelRow(channel)
                 }
+                // Einfüge-Linie zwischen den Kanälen ohne Ordner.
+                .dropDestination(for: String.self) { items, index in
+                    insertChannels(items, folder: nil, at: index)
+                }
             } header: {
                 Text("Abonnements")
-                    // Auf die Überschrift ziehen = ganz nach oben (Kanäle: ohne Ordner).
-                    .dropDestination(for: String.self) { items, _ in
-                        dropOnHeader(items)
-                    } isTargeted: { highlight("header", $0) }
-                    .background(dropHighlight("header"))
             }
         }
         .listStyle(.sidebar)
@@ -130,10 +137,6 @@ struct SidebarView: View {
         .badge(count(.channel(channel.id)))
         .tag(SidebarSelection.channel(channel.id))
         .draggable("channel:\(channel.id)")
-        .dropDestination(for: String.self) { items, _ in
-            dropOnChannel(items, target: channel.id)
-        } isTargeted: { highlight("channel:\(channel.id)", $0) }
-        .background(dropHighlight("channel:\(channel.id)"))
         .contextMenu { channelMenu(channel) }
     }
 
@@ -206,48 +209,28 @@ struct SidebarView: View {
 
     // MARK: Drag & Drop
 
-    /// Kanal auf Kanal: an dessen Stelle (und in dessen Ordner) setzen.
-    private func dropOnChannel(_ items: [String], target: String) -> Bool {
-        var handled = false
+    /// Kanäle an der Einfüge-Linie (Position `index` innerhalb der Gruppe) ablegen.
+    private func insertChannels(_ items: [String], folder: UUID?, at index: Int) {
+        var position = index
         for case .channel(let id) in items.compactMap(DragItem.init) where store.channel(id) != nil {
-            store.moveChannel(id, onto: target)
-            handled = true
+            store.moveChannel(id, toFolder: folder, at: position)
+            position += 1
         }
-        return handled
     }
 
-    /// Kanal auf Ordner: hinein (ans Ende). Ordner auf Ordner: an dessen Stelle.
+    /// Ordner an der Einfüge-Linie ablegen.
+    private func insertFolders(_ items: [String], at index: Int) {
+        for case .folder(let id) in items.compactMap(DragItem.init) {
+            store.moveFolder(id, to: index)
+        }
+    }
+
+    /// Kanal direkt auf den Ordnernamen gezogen: hinein, ans Ende.
     private func dropOnFolder(_ items: [String], folder: UUID) -> Bool {
         var handled = false
-        for item in items.compactMap(DragItem.init) {
-            switch item {
-            case .channel(let id) where store.channel(id) != nil:
-                store.moveChannel(id, toFolder: folder)
-                handled = true
-            case .folder(let id):
-                store.moveFolder(id, onto: folder)
-                handled = true
-            default:
-                break
-            }
-        }
-        return handled
-    }
-
-    /// Auf die Überschrift: Ordner ganz nach oben, Kanäle ohne Ordner ganz nach oben.
-    private func dropOnHeader(_ items: [String]) -> Bool {
-        var handled = false
-        for item in items.compactMap(DragItem.init) {
-            switch item {
-            case .channel(let id) where store.channel(id) != nil:
-                store.moveChannel(id, toFolder: nil, atTop: true)
-                handled = true
-            case .folder(let id):
-                store.moveFolderToTop(id)
-                handled = true
-            default:
-                break
-            }
+        for case .channel(let id) in items.compactMap(DragItem.init) where store.channel(id) != nil {
+            store.moveChannel(id, toFolder: folder)
+            handled = true
         }
         return handled
     }

@@ -313,33 +313,28 @@ final class AppStore {
     // Die Reihenfolge in der Seitenleiste entspricht der Reihenfolge der Arrays `channels`
     // und `folders` – sie wird nur noch durch den Nutzer verändert (Drag & Drop, Menü).
 
-    /// Verschiebt einen Kanal in einen Ordner (`nil` = ohne Ordner) – ans Ende oder an den Anfang.
-    func moveChannel(_ channelID: String, toFolder folderID: UUID?, atTop: Bool = false) {
-        guard let index = channels.firstIndex(where: { $0.id == channelID }) else { return }
-        var channel = channels.remove(at: index)
-        channel.folderID = folderID
-        if atTop, let first = channels.firstIndex(where: { $0.folderID == folderID }) {
-            channels.insert(channel, at: first)
-        } else if !atTop, let last = channels.lastIndex(where: { $0.folderID == folderID }) {
-            channels.insert(channel, at: last + 1)
-        } else {
-            channels.insert(channel, at: atTop ? 0 : channels.count)
-        }
-        save()
+    /// Verschiebt einen Kanal in einen Ordner (`nil` = ohne Ordner), ans Ende.
+    func moveChannel(_ channelID: String, toFolder folderID: UUID?) {
+        moveChannel(channelID, toFolder: folderID, at: channels(inFolder: folderID).count)
     }
 
-    /// Setzt einen Kanal an die Stelle eines anderen (übernimmt dessen Ordner).
-    /// Nach unten gezogen landet er hinter dem Ziel, nach oben gezogen davor.
-    func moveChannel(_ channelID: String, onto targetID: String) {
-        guard channelID != targetID,
-              let from = channels.firstIndex(where: { $0.id == channelID }),
-              let to = channels.firstIndex(where: { $0.id == targetID }) else { return }
-        let target = channels[to]
-        let movingDown = channels[from].folderID == target.folderID && from < to
+    /// Legt einen Kanal an Position `index` der Gruppe `folderID` ab, also vor das Element,
+    /// das dort vor dem Verschieben stand (wie die Einfüge-Linie der Liste es anzeigt).
+    func moveChannel(_ channelID: String, toFolder folderID: UUID?, at index: Int) {
+        let group = channels(inFolder: folderID)
+        let beforeID = index < group.count ? group[index].id : nil
+        guard let from = channels.firstIndex(where: { $0.id == channelID }) else { return }
         var channel = channels.remove(at: from)
-        channel.folderID = target.folderID
-        guard let newTo = channels.firstIndex(where: { $0.id == targetID }) else { return }
-        channels.insert(channel, at: movingDown ? newTo + 1 : newTo)
+        channel.folderID = folderID
+        if let beforeID, beforeID != channelID, let position = channels.firstIndex(where: { $0.id == beforeID }) {
+            channels.insert(channel, at: position)
+        } else if beforeID == channelID {
+            channels.insert(channel, at: from)   // an derselben Stelle abgelegt
+        } else if let last = channels.lastIndex(where: { $0.folderID == folderID }) {
+            channels.insert(channel, at: last + 1)
+        } else {
+            channels.append(channel)
+        }
         save()
     }
 
@@ -349,17 +344,20 @@ final class AppStore {
         let group = channels(inFolder: channel.folderID)
         guard let position = group.firstIndex(where: { $0.id == channelID }),
               group.indices.contains(position + offset) else { return }
-        moveChannel(channelID, onto: group[position + offset].id)
+        moveChannel(channelID, toFolder: channel.folderID, at: offset < 0 ? position - 1 : position + 2)
     }
 
-    /// Setzt einen Ordner an die Stelle eines anderen.
-    func moveFolder(_ folderID: UUID, onto targetID: UUID) {
-        guard folderID != targetID,
-              let from = folders.firstIndex(where: { $0.id == folderID }),
-              let to = folders.firstIndex(where: { $0.id == targetID }) else { return }
-        // Nach unten gezogen landet der Ordner hinter dem Ziel, nach oben gezogen davor.
+    /// Legt einen Ordner an Position `index` ab (vor den Ordner, der dort stand).
+    func moveFolder(_ folderID: UUID, to index: Int) {
+        guard let from = folders.firstIndex(where: { $0.id == folderID }) else { return }
+        let beforeID = index < folders.count ? folders[index].id : nil
+        guard beforeID != folderID else { return }
         let folder = folders.remove(at: from)
-        folders.insert(folder, at: to)
+        if let beforeID, let position = folders.firstIndex(where: { $0.id == beforeID }) {
+            folders.insert(folder, at: position)
+        } else {
+            folders.append(folder)
+        }
         save()
     }
 
@@ -367,12 +365,6 @@ final class AppStore {
         guard let position = folders.firstIndex(where: { $0.id == folderID }),
               folders.indices.contains(position + offset) else { return }
         folders.swapAt(position, position + offset)
-        save()
-    }
-
-    func moveFolderToTop(_ folderID: UUID) {
-        guard let index = folders.firstIndex(where: { $0.id == folderID }) else { return }
-        folders.insert(folders.remove(at: index), at: 0)
         save()
     }
 
