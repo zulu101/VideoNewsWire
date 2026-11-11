@@ -19,13 +19,13 @@ struct VideoNewsWireApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Kanal hinzufügen…") { store.showingAddChannel = true }
+                Button("Add Channel…") { store.showingAddChannel = true }
                     .keyboardShortcut("n")
-                Button("Neuer Ordner…") { store.showingNewFolder = true }
+                Button("New Folder…") { store.showingNewFolder = true }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
             }
             CommandMenu("Videos") {
-                Button("Alle Kanäle aktualisieren") {
+                Button("Refresh All Channels") {
                     Task { await store.refreshAll() }
                 }
                 .keyboardShortcut("r")
@@ -43,7 +43,7 @@ struct VideoNewsWireApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Nötig, wenn die App direkt per `swift run` (ohne .app-Bundle) gestartet wird.
+        // Needed when the app is started directly via `swift run` (without an .app bundle).
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
     }

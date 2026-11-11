@@ -4,9 +4,9 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            Tab("Allgemein", systemImage: "gearshape") { GeneralSettingsView() }
+            Tab("General", systemImage: "gearshape") { GeneralSettingsView() }
             Tab("Downloads", systemImage: "arrow.down.circle") { DownloadSettingsView() }
-            Tab("KI", systemImage: "sparkles") { AISettingsView() }
+            Tab("AI", systemImage: "sparkles") { AISettingsView() }
         }
         .frame(width: 560)
     }
@@ -20,15 +20,15 @@ private struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Weniger Ablenkung") {
-                Toggle("Shorts ausblenden", isOn: $hideShorts)
-                Toggle("Vorschaubilder anzeigen", isOn: $showThumbnails)
-                Text("Thumbnails sind auf Klicks optimiert. Ohne sie entscheidest du anhand des Titels.")
+            Section("Fewer Distractions") {
+                Toggle("Hide Shorts", isOn: $hideShorts)
+                Toggle("Show thumbnails", isOn: $showThumbnails)
+                Text("Thumbnails are optimized for clicks. Without them, you decide by the title.")
                     .font(.caption).foregroundStyle(.secondary)
-                Toggle("Zähler für ungesehene Videos anzeigen", isOn: $showUnreadCounts)
+                Toggle("Show counts of unwatched videos", isOn: $showUnreadCounts)
             }
-            Section("Verhalten") {
-                Toggle("Video beim Öffnen als gesehen markieren", isOn: $markWatchedOnOpen)
+            Section("Behavior") {
+                Toggle("Mark videos as watched when opened", isOn: $markWatchedOnOpen)
             }
         }
         .formStyle(.grouped)
@@ -43,16 +43,16 @@ private struct DownloadSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Speicherort") {
-                LabeledContent("Ordner") {
+            Section("Location") {
+                LabeledContent("Folder") {
                     HStack {
                         Text(Prefs.downloadFolderURL.path(percentEncoded: false))
                             .lineLimit(1).truncationMode(.middle)
                             .foregroundStyle(.secondary)
-                        Button("Ändern…", action: chooseFolder)
+                        Button("Change…", action: chooseFolder)
                     }
                 }
-                Picker("Maximale Auflösung", selection: $maxHeight) {
+                Picker("Maximum resolution", selection: $maxHeight) {
                     Text("720p").tag(720)
                     Text("1080p").tag(1080)
                     Text("1440p").tag(1440)
@@ -63,16 +63,16 @@ private struct DownloadSettingsView: View {
             Section("yt-dlp") {
                 LabeledContent("Status") {
                     if ytdlp.isInstalled {
-                        Text("Installiert – Version \(ytdlp.version ?? "?")")
+                        Text("Installed – version \(ytdlp.version ?? "?")")
                     } else {
-                        Text("Nicht installiert").foregroundStyle(.orange)
+                        Text("Not installed").foregroundStyle(.orange)
                     }
                 }
                 HStack {
                     if ytdlp.isInstalled {
-                        Button("Jetzt aktualisieren") { Task { await ytdlp.update() } }
+                        Button("Update Now") { Task { await ytdlp.update() } }
                     } else {
-                        Button("yt-dlp installieren") { Task { await ytdlp.install() } }
+                        Button("Install yt-dlp") { Task { await ytdlp.install() } }
                     }
                     if ytdlp.isBusy { ProgressView().controlSize(.small) }
                 }
@@ -80,14 +80,14 @@ private struct DownloadSettingsView: View {
                 if let status = ytdlp.statusMessage {
                     Text(status).font(.caption).foregroundStyle(.secondary)
                 }
-                Toggle("Automatisch aktualisieren (alle 3 Tage beim Start)", isOn: $autoUpdate)
-                Text("yt-dlp wird von github.com/yt-dlp/yt-dlp geladen und in „~/Library/Application Support/VideoNewsWire“ abgelegt.")
+                Toggle("Update automatically (every 3 days at launch)", isOn: $autoUpdate)
+                Text("yt-dlp is downloaded from github.com/yt-dlp/yt-dlp and stored in “~/Library/Application Support/VideoNewsWire”.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section("Optionale Helfer (Homebrew)") {
-                toolRow("ffmpeg", purpose: "für Auflösungen über 720p (Video und Ton zusammenführen)")
-                toolRow("deno", purpose: "von yt-dlp empfohlen, damit alle YouTube-Formate verfügbar sind")
+            Section("Optional Helpers (Homebrew)") {
+                toolRow("ffmpeg", purpose: "for resolutions above 720p (merges video and audio)")
+                toolRow("deno", purpose: "recommended by yt-dlp so all YouTube formats are available")
                 Text("Installation: `brew install ffmpeg deno`")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -96,10 +96,10 @@ private struct DownloadSettingsView: View {
         .task { await ytdlp.refreshVersion() }
     }
 
-    private func toolRow(_ name: String, purpose: String) -> some View {
+    private func toolRow(_ name: String, purpose: LocalizedStringKey) -> some View {
         let found = ProcessRunner.findTool(name) != nil
         return LabeledContent {
-            Label(found ? "Gefunden" : "Nicht gefunden",
+            Label(found ? String(localized: "Found") : String(localized: "Not found"),
                   systemImage: found ? "checkmark.circle.fill" : "xmark.circle")
                 .foregroundStyle(found ? .green : .secondary)
         } label: {
@@ -130,12 +130,10 @@ private struct AISettingsView: View {
                     Label(reason, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                 } else {
-                    Label("Verfügbar", systemImage: "checkmark.circle.fill")
+                    Label("Available", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 }
-                Text("Zusammenfassungen werden vollständig auf diesem Mac mit Apples Foundation Models erstellt. "
-                     + "Es werden keine Daten an einen KI-Dienst gesendet. Grundlage ist das Transkript "
-                     + "(Untertitel via yt-dlp), ersatzweise die Videobeschreibung.")
+                Text("Summaries are created entirely on this Mac with Apple’s Foundation Models. No data is sent to an AI service. They are based on the transcript (subtitles via yt-dlp), or the video description as a fallback.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

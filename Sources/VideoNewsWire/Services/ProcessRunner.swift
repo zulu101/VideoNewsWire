@@ -7,16 +7,16 @@ struct ProcessResult {
 
     var succeeded: Bool { status == 0 }
 
-    /// Letzte aussagekräftige Fehlerzeile (z. B. "ERROR: …" von yt-dlp).
+    /// Last meaningful error line (e.g. "ERROR: …" from yt-dlp).
     var errorSummary: String {
         let lines = stderr.split(separator: "\n").map(String.init)
-        return lines.last(where: { $0.contains("ERROR") }) ?? lines.last ?? "Unbekannter Fehler (Exit-Code \(status))"
+        return lines.last(where: { $0.contains("ERROR") }) ?? lines.last ?? String(localized: "Unknown error (exit code \(status))")
     }
 }
 
-/// Startet externe Programme (yt-dlp) asynchron und liefert die Ausgabe zeilenweise.
+/// Runs external programs (yt-dlp) asynchronously and delivers their output line by line.
 enum ProcessRunner {
-    /// Homebrew-Pfade zuerst, damit yt-dlp ffmpeg und deno findet.
+    /// Homebrew paths first, so yt-dlp finds ffmpeg and deno.
     static let searchPaths = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
 
     static func environment() -> [String: String] {

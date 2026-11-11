@@ -1,6 +1,6 @@
 import Foundation
 
-/// Lädt die öffentlichen RSS-Feeds von YouTube-Kanälen (kein API-Key, kein Login nötig).
+/// Loads YouTube channels' public RSS feeds (no API key, no sign-in needed).
 enum FeedService {
     struct Feed {
         var channelTitle: String
@@ -13,7 +13,7 @@ enum FeedService {
         request.cachePolicy = .reloadIgnoringLocalCacheData
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw AppError("Feed nicht erreichbar (HTTP \(http.statusCode)).")
+            throw AppError(String(localized: "Feed not reachable (HTTP \(http.statusCode))."))
         }
         let parser = FeedParser(channelID: channelID)
         try parser.parse(data)
@@ -25,7 +25,7 @@ enum FeedService {
     }
 }
 
-/// Minimaler Atom-Parser für `https://www.youtube.com/feeds/videos.xml`.
+/// Minimal Atom parser for `https://www.youtube.com/feeds/videos.xml`.
 final class FeedParser: NSObject, XMLParserDelegate {
     private let channelID: String
     private(set) var channelTitle = ""
@@ -52,7 +52,7 @@ final class FeedParser: NSObject, XMLParserDelegate {
         let parser = XMLParser(data: data)
         parser.delegate = self
         guard parser.parse() else {
-            throw parser.parserError ?? AppError("Feed konnte nicht gelesen werden.")
+            throw parser.parserError ?? AppError(String(localized: "The feed could not be read."))
         }
     }
 

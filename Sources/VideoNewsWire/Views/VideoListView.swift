@@ -24,21 +24,21 @@ struct VideoListView: View {
             if items.isEmpty { emptyState }
         }
         .navigationTitle(title)
-        .searchable(text: $searchText, prompt: "Titel, Beschreibung, Kanal")
+        .searchable(text: $searchText, prompt: "Title, description, channel")
         .toolbar {
             ToolbarItem {
-                Button("Alle als gesehen markieren", systemImage: "checkmark.circle") {
+                Button("Mark All as Watched", systemImage: "checkmark.circle") {
                     store.markWatched(items.map(\.id))
                 }
                 .disabled(items.isEmpty)
-                .help("Alle Videos in dieser Liste als gesehen markieren")
+                .help("Mark all videos in this list as watched")
             }
         }
     }
 
     private var filteredVideos: [Video] {
         let list = store.videos(for: selection, hideShorts: hideShorts, keeping: selectedVideoID)
-        // Mehrere Suchbegriffe müssen alle vorkommen (in Titel, Kanal, Beschreibung oder KI-Zusammenfassung).
+        // With several search terms, all must match (in title, channel, description or AI summary).
         let terms = searchText.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !terms.isEmpty else { return list }
         return list.filter { video in
@@ -60,47 +60,47 @@ struct VideoListView: View {
     private var title: String {
         switch selection {
         case .smart(let feed): feed.title
-        case .folder(let id): store.folder(id)?.name ?? "Ordner"
-        case .channel(let id): store.channel(id)?.title ?? "Kanal"
+        case .folder(let id): store.folder(id)?.name ?? String(localized: "Folder")
+        case .channel(let id): store.channel(id)?.title ?? String(localized: "Channel")
         }
     }
 
     @ViewBuilder private var emptyState: some View {
         if store.channels.isEmpty {
             ContentUnavailableView {
-                Label("Noch keine Abos", systemImage: "person.crop.square.badge.plus")
+                Label("No Subscriptions Yet", systemImage: "person.crop.square.badge.plus")
             } description: {
-                Text("Füge Kanäle hinzu oder importiere deine YouTube-Abos.")
+                Text("Add channels or import your YouTube subscriptions.")
             } actions: {
-                Button("Kanal hinzufügen…") { store.showingAddChannel = true }
+                Button("Add Channel…") { store.showingAddChannel = true }
             }
         } else if !searchText.isEmpty {
             ContentUnavailableView.search(text: searchText)
         } else if selection == .smart(.unwatched) {
-            ContentUnavailableView("Alles gesehen", systemImage: "checkmark.circle",
-                                   description: Text("Keine neuen Videos. Zeit für etwas anderes."))
+            ContentUnavailableView("All Caught Up", systemImage: "checkmark.circle",
+                                   description: Text("No new videos. Time for something else."))
         } else {
-            ContentUnavailableView("Keine Videos", systemImage: "tray")
+            ContentUnavailableView("No Videos", systemImage: "tray")
         }
     }
 
     @ViewBuilder private func contextMenu(for video: Video) -> some View {
         let state = store.state(video.id)
-        Button(state.watched ? "Als neu markieren" : "Als gesehen markieren") {
+        Button(state.watched ? String(localized: "Mark as New") : String(localized: "Mark as Watched")) {
             store.update(video.id) { $0.watched.toggle() }
         }
-        Button(state.saved ? "Von Merkliste entfernen" : "Merken") {
+        Button(state.saved ? String(localized: "Remove from Watch Later") : String(localized: "Save for Later")) {
             store.update(video.id) { $0.saved.toggle() }
         }
         Divider()
         if let file = store.localFileURL(for: video.id) {
-            Button("Im Finder zeigen") { NSWorkspace.shared.activateFileViewerSelecting([file]) }
-            Button("Download löschen", role: .destructive) { store.deleteDownload(video.id) }
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([file]) }
+            Button("Delete Download", role: .destructive) { store.deleteDownload(video.id) }
         } else {
-            Button("Herunterladen") { store.download(video) }
+            Button("Download") { store.download(video) }
         }
         Divider()
-        Button("Link kopieren") {
+        Button("Copy Link") {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(video.watchURL.absoluteString, forType: .string)
         }

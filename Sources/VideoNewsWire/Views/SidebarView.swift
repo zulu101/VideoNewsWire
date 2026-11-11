@@ -9,10 +9,10 @@ struct SidebarView: View {
 
     @State private var prompt: FolderPrompt?
     @State private var folderName = ""
-    /// Ordner, der gerade gezogen wird (nur für die Anzeige der Einfüge-Linie).
+    /// Folder currently being dragged (only used to show the insertion line).
     @State private var draggedFolderID: UUID?
 
-    /// Inhalt eines Drags in der Seitenleiste: Kanal oder Ordner.
+    /// Payload of a drag in the sidebar: channel or folder.
     enum DragItem {
         case channel(String)
         case folder(UUID)
@@ -29,7 +29,7 @@ struct SidebarView: View {
         }
     }
 
-    /// Eingabedialog zum Anlegen oder Umbenennen eines Ordners.
+    /// Input dialog for creating or renaming a folder.
     enum FolderPrompt: Identifiable {
         case create(moveChannelID: String?)
         case rename(UUID)
@@ -44,7 +44,7 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
-            Section("Übersicht") {
+            Section("Overview") {
                 ForEach(SmartFeed.allCases, id: \.self) { feed in
                     Label(feed.title, systemImage: feed.systemImage)
                         .badge(count(.smart(feed)))
@@ -58,7 +58,7 @@ struct SidebarView: View {
                         ForEach(store.channels(inFolder: folder.id)) { channel in
                             channelRow(channel)
                         }
-                        // Einfüge-Linie zwischen den Kanälen dieses Ordners.
+                        // Insertion line between this folder's channels.
                         .dropDestination(for: String.self) { items, index in
                             insertChannels(items, folder: folder.id, at: index)
                         }
@@ -74,26 +74,26 @@ struct SidebarView: View {
                         .contextMenu { folderMenu(folder) }
                     }
                 }
-                // Bewusst KEIN `.dropDestination(for:action:)` mit Index auf dieser ForEach:
-                // SwiftUI stürzt bei Einfüge-Drops zwischen aufklappbaren Gruppen ab
-                // (OutlineListCoordinator.performDropInsertion). Ordner werden über
-                // FolderLabel mit eigener Einfüge-Linie sortiert.
+                // Deliberately NO indexed `.dropDestination(for:action:)` on this ForEach:
+                // SwiftUI crashes on insertion drops between disclosure groups
+                // (OutlineListCoordinator.performDropInsertion). Folders are reordered
+                // through FolderLabel with its own insertion line instead.
 
                 ForEach(store.channels(inFolder: nil)) { channel in
                     channelRow(channel)
                 }
-                // Einfüge-Linie zwischen den Kanälen ohne Ordner.
+                // Insertion line between channels without a folder.
                 .dropDestination(for: String.self) { items, index in
                     insertChannels(items, folder: nil, at: index)
                 }
             } header: {
-                Text("Abonnements")
+                Text("Subscriptions")
             }
         }
         .listStyle(.sidebar)
         .contextMenu {
-            Button("Neuer Ordner…") { askForNewFolder() }
-            Button("Alphabetisch sortieren") { store.sortAlphabetically() }
+            Button("New Folder…") { askForNewFolder() }
+            Button("Sort Alphabetically") { store.sortAlphabetically() }
         }
         .safeAreaInset(edge: .bottom) {
             statusLine
@@ -109,7 +109,7 @@ struct SidebarView: View {
         ), presenting: prompt) { prompt in
             TextField("Name", text: $folderName)
             Button(promptButtonTitle(prompt)) { commit(prompt) }
-            Button("Abbrechen", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         }
         .onChange(of: store.showingNewFolder) { _, show in
             if show {
@@ -119,7 +119,7 @@ struct SidebarView: View {
         }
     }
 
-    // MARK: Zeilen
+    // MARK: Rows
 
     private func channelRow(_ channel: Channel) -> some View {
         Label {
@@ -142,43 +142,43 @@ struct SidebarView: View {
     }
 
     @ViewBuilder private func channelMenu(_ channel: Channel) -> some View {
-        Menu("In Ordner verschieben") {
+        Menu("Move to Folder") {
             ForEach(store.folders) { folder in
                 Button(folder.name) { store.moveChannel(channel.id, toFolder: folder.id) }
                     .disabled(channel.folderID == folder.id)
             }
             if channel.folderID != nil {
                 Divider()
-                Button("Aus Ordner entfernen") { store.moveChannel(channel.id, toFolder: nil) }
+                Button("Remove from Folder") { store.moveChannel(channel.id, toFolder: nil) }
             }
             Divider()
-            Button("Neuer Ordner…") { askForNewFolder(moving: channel.id) }
+            Button("New Folder…") { askForNewFolder(moving: channel.id) }
         }
-        Button("Nach oben") { store.nudgeChannel(channel.id, by: -1) }
-        Button("Nach unten") { store.nudgeChannel(channel.id, by: 1) }
-        Button("Alle als gesehen markieren") {
+        Button("Move Up") { store.nudgeChannel(channel.id, by: -1) }
+        Button("Move Down") { store.nudgeChannel(channel.id, by: 1) }
+        Button("Mark All as Watched") {
             store.markWatched(store.videos(for: .channel(channel.id), hideShorts: false).map(\.id))
         }
         Divider()
-        Button("Abbestellen", role: .destructive) {
+        Button("Unsubscribe", role: .destructive) {
             if selection == .channel(channel.id) { selection = .smart(.unwatched) }
             store.removeChannel(channel.id)
         }
     }
 
     @ViewBuilder private func folderMenu(_ folder: Folder) -> some View {
-        Button("Umbenennen…") {
+        Button("Rename…") {
             folderName = folder.name
             prompt = .rename(folder.id)
         }
-        Button("Alle als gesehen markieren") {
+        Button("Mark All as Watched") {
             store.markWatched(store.videos(for: .folder(folder.id), hideShorts: false).map(\.id))
         }
-        Button("Nach oben") { store.nudgeFolder(folder.id, by: -1) }
-        Button("Nach unten") { store.nudgeFolder(folder.id, by: 1) }
+        Button("Move Up") { store.nudgeFolder(folder.id, by: -1) }
+        Button("Move Down") { store.nudgeFolder(folder.id, by: 1) }
         Divider()
-        Button("Neuer Ordner…") { askForNewFolder() }
-        Button("Ordner löschen (Abos bleiben erhalten)", role: .destructive) {
+        Button("New Folder…") { askForNewFolder() }
+        Button("Delete Folder (Keeps Subscriptions)", role: .destructive) {
             if selection == .folder(folder.id) { selection = .smart(.unwatched) }
             store.deleteFolder(folder.id)
         }
@@ -188,14 +188,14 @@ struct SidebarView: View {
         if store.isRefreshing {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
-                Text("Aktualisiere \(store.refreshDone)/\(store.refreshTotal)…")
+                Text("Updating \(store.refreshDone)/\(store.refreshTotal)…")
             }
         } else if let last = store.lastRefresh {
-            Text("Aktualisiert \(last, format: .relative(presentation: .named))")
+            Text("Updated \(last, format: .relative(presentation: .named))")
         }
     }
 
-    // MARK: Helfer
+    // MARK: Helpers
 
     private func count(_ selection: SidebarSelection) -> Int {
         showCounts ? store.unwatchedCount(selection, hideShorts: hideShorts) : 0
@@ -210,7 +210,7 @@ struct SidebarView: View {
 
     // MARK: Drag & Drop
 
-    /// Kanäle an der Einfüge-Linie (Position `index` innerhalb der Gruppe) ablegen.
+    /// Drops channels at the insertion line (position `index` within the group).
     private func insertChannels(_ items: [String], folder: UUID?, at index: Int) {
         draggedFolderID = nil
         var position = index
@@ -220,7 +220,7 @@ struct SidebarView: View {
         }
     }
 
-    /// Ablage auf einem Ordnernamen: Ordner davor/dahinter einsortieren, Kanal hineinlegen.
+    /// Drop on a folder name: put a folder before/after it, move a channel into it.
     private func handleFolderDrop(_ payload: String, zone: FolderDropZone, target: UUID) {
         draggedFolderID = nil
         switch DragItem(payload) {
@@ -240,13 +240,13 @@ struct SidebarView: View {
     }
 
     private var promptTitle: String {
-        if case .rename = prompt { return "Ordner umbenennen" }
-        return "Neuer Ordner"
+        if case .rename = prompt { return String(localized: "Rename Folder") }
+        return String(localized: "New Folder")
     }
 
     private func promptButtonTitle(_ prompt: FolderPrompt) -> String {
-        if case .rename = prompt { return "Umbenennen" }
-        return "Anlegen"
+        if case .rename = prompt { return String(localized: "Rename") }
+        return String(localized: "Create")
     }
 
     private func commit(_ prompt: FolderPrompt) {
@@ -261,7 +261,7 @@ struct SidebarView: View {
     }
 }
 
-/// Rundes Kanalbild; Platzhalter, solange keins geladen ist.
+/// Round channel avatar; a placeholder until one is loaded.
 struct ChannelIcon: View {
     @Environment(AppStore.self) private var store
     let channelID: String
@@ -285,14 +285,14 @@ struct ChannelIcon: View {
     }
 }
 
-// MARK: - Ordner-Zeile mit eigener Drop-Logik
+// MARK: - Folder row with its own drop logic
 
 enum FolderDropZone {
     case none, above, inside, below
 }
 
-/// Ordnername in der Seitenleiste. Beim Ziehen eines Ordners zeigt eine Linie oberhalb oder
-/// unterhalb, wo er landet; beim Ziehen eines Kanals wird der Ordner hervorgehoben (hinein).
+/// Folder name in the sidebar. When a folder is dragged, a line above or below shows where it
+/// will land; when a channel is dragged, the folder is highlighted (drop into it).
 private struct FolderLabel: View {
     let folder: Folder
     let badge: Int
@@ -330,7 +330,7 @@ private struct FolderLabel: View {
     }
 }
 
-/// Einfüge-Linie im Stil von macOS: Kreis links, durchgehende Linie in Akzentfarbe.
+/// macOS-style insertion line: circle on the left, solid line in the accent color.
 private struct InsertionLine: View {
     var body: some View {
         HStack(spacing: 0) {
@@ -380,7 +380,7 @@ private struct FolderDropDelegate: DropDelegate {
         return true
     }
 
-    /// Ordner: obere Hälfte = davor, untere Hälfte = dahinter. Kanal: hinein.
+    /// Folder: upper half = before, lower half = after. Channel: into the folder.
     private func update(_ info: DropInfo) {
         if isFolderDrag() {
             zone = info.location.y < height / 2 ? .above : .below

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Drei-Spalten-Layout wie NetNewsWire: Seitenleiste · Videoliste · Video.
+/// Three-pane layout like NetNewsWire: sidebar · video list · video.
 struct ContentView: View {
     @Environment(AppStore.self) private var store
     @Environment(YTDLPManager.self) private var ytdlp
@@ -23,22 +23,22 @@ struct ContentView: View {
                 VideoDetailView(video: video)
                     .id(id)
             } else {
-                ContentUnavailableView("Kein Video ausgewählt", systemImage: "play.rectangle",
-                                       description: Text("Wähle links ein Video aus."))
+                ContentUnavailableView("No Video Selected", systemImage: "play.rectangle",
+                                       description: Text("Choose a video on the left."))
             }
         }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button("Aktualisieren", systemImage: "arrow.clockwise") {
+                Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await store.refreshAll() }
                 }
                 .disabled(store.isRefreshing)
-                .help("Alle Kanäle aktualisieren (⌘R)")
+                .help("Refresh all channels (⌘R)")
 
-                Button("Kanal hinzufügen", systemImage: "plus") {
+                Button("Add Channel", systemImage: "plus") {
                     store.showingAddChannel = true
                 }
-                .help("Kanal hinzufügen (⌘N)")
+                .help("Add a channel (⌘N)")
             }
         }
         .onChange(of: sidebarSelection) { _, _ in
@@ -52,7 +52,7 @@ struct ContentView: View {
         .sheet(isPresented: $store.showingAddChannel) {
             AddChannelSheet()
         }
-        .alert("Fehler", isPresented: Binding(
+        .alert("Error", isPresented: Binding(
             get: { store.errorMessage != nil },
             set: { if !$0 { store.errorMessage = nil } }
         )) {
@@ -61,7 +61,7 @@ struct ContentView: View {
             Text(store.errorMessage ?? "")
         }
         .task {
-            // Beim Start aktualisieren, aber nicht öfter als alle 15 Minuten.
+            // Refresh at launch, but not more often than every 15 minutes.
             if Date().timeIntervalSince(store.lastRefresh ?? .distantPast) > 15 * 60 {
                 await store.refreshAll()
             }

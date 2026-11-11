@@ -19,47 +19,46 @@ struct AddChannelSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Kanal hinzufügen").font(.title2.bold())
+            Text("Add Channel").font(.title2.bold())
 
-            Text("Kanal-URL, @Handle, Kanal-ID (UC…) oder die URL eines Videos des Kanals.")
+            Text("Channel URL, @handle, channel ID (UC…) or the URL of one of the channel’s videos.")
                 .foregroundStyle(.secondary)
             HStack {
-                TextField("z. B. @kurzgesagt", text: $input)
+                TextField("e.g. @kurzgesagt", text: $input)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(addChannel)
-                Button("Hinzufügen", action: addChannel)
+                Button("Add", action: addChannel)
                     .keyboardShortcut(.defaultAction)
                     .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || isBusy)
             }
 
             Divider().padding(.vertical, 4)
 
-            Text("Abos importieren").font(.headline)
+            Text("Import Subscriptions").font(.headline)
 
             HStack {
                 Picker("Browser", selection: $browser) {
                     ForEach(Self.browsers, id: \.id) { Text($0.name).tag($0.id) }
                 }
                 .frame(width: 200)
-                Button("Aus YouTube-Konto übernehmen", action: syncFromAccount)
+                Button("Import from YouTube Account", action: syncFromAccount)
                     .disabled(!ytdlp.isInstalled || isBusy)
             }
-            Text("Liest die Abos deines im Browser angemeldeten YouTube-Kontos mit yt-dlp aus. "
-                 + "Für Safari benötigt die App Festplattenvollzugriff (Systemeinstellungen → Datenschutz & Sicherheit).")
+            Text("Reads the subscriptions of the YouTube account you’re signed in to in your browser, using yt-dlp. For Safari, the app needs Full Disk Access (System Settings → Privacy & Security).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if !ytdlp.isInstalled {
-                Text("yt-dlp ist noch nicht installiert (Einstellungen → Downloads).")
+                Text("yt-dlp is not installed yet (Settings → Downloads).")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
 
             HStack {
-                Button("Google-Takeout-Datei (subscriptions.csv)…") { isImportingFile = true }
+                Button("Google Takeout File (subscriptions.csv)…") { isImportingFile = true }
                     .disabled(isBusy)
             }
-            Text("Alternative ohne Browser-Cookies: takeout.google.com → nur „YouTube und YouTube Music“ → Abos.")
+            Text("Alternative without browser cookies: takeout.google.com → only “YouTube and YouTube Music” → subscriptions.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -72,7 +71,7 @@ struct AddChannelSheet: View {
 
             HStack {
                 Spacer()
-                Button("Fertig") { dismiss() }
+                Button("Done") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
         }
@@ -89,27 +88,27 @@ struct AddChannelSheet: View {
 
     private func addChannel() {
         let text = input
-        run("Suche Kanal…") {
+        run(String(localized: "Looking up channel…")) {
             let channel = try await store.addChannel(text)
             input = ""
-            return "„\(channel.title)“ hinzugefügt."
+            return String(localized: "Added “\(channel.title)”.")
         }
     }
 
     private func syncFromAccount() {
-        run("Lese Abos aus \(browser)…") {
+        run(String(localized: "Reading subscriptions from \(browser)…")) {
             let list = try await ytdlp.subscribedChannels(browser: browser)
-            guard !list.isEmpty else { throw AppError("Keine Abos gefunden. Bist du im Browser bei YouTube angemeldet?") }
-            message = "\(list.count) Abos gefunden, lade Feeds…"
+            guard !list.isEmpty else { throw AppError(String(localized: "No subscriptions found. Are you signed in to YouTube in your browser?")) }
+            message = String(localized: "Found \(list.count) subscriptions, loading feeds…")
             let added = await store.importChannels(list)
-            return "\(added) neue Kanäle übernommen (\(list.count) Abos insgesamt)."
+            return String(localized: "Imported \(added) new channels (\(list.count) subscriptions in total).")
         }
     }
 
     private func importCSV(_ url: URL) {
-        run("Importiere…") {
+        run(String(localized: "Importing…")) {
             let added = try await store.importTakeoutCSV(from: url)
-            return "\(added) neue Kanäle importiert."
+            return String(localized: "Imported \(added) new channels.")
         }
     }
 

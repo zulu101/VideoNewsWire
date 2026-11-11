@@ -1,12 +1,13 @@
 import Foundation
 import FoundationModels
 
-/// KI-Zusammenfassung komplett on-device mit Apples Foundation Models (Apple Intelligence).
+/// AI summaries entirely on-device with Apple's Foundation Models (Apple Intelligence).
 ///
-/// Das lokale Modell hat ein kleines Kontextfenster (ca. 4 096 Tokens). Lange Transkripte werden
-/// deshalb in Abschnitte zerlegt, einzeln verdichtet (map) und anschließend zusammengeführt (reduce).
+/// The local model has a small context window (about 4,096 tokens). Long transcripts are therefore
+/// split into sections, condensed one by one (map) and then combined (reduce).
+/// Summaries are written in the app's current language (English, or German on German systems).
 enum Summarizer {
-    /// `nil`, wenn das Modell verfügbar ist – sonst eine verständliche Begründung.
+    /// `nil` if the model is available, otherwise a human-readable reason.
     static var unavailableReason: String? {
         switch SystemLanguageModel.default.availability {
         case .available:
@@ -14,34 +15,50 @@ enum Summarizer {
         case .unavailable(let reason):
             switch reason {
             case .deviceNotEligible:
-                return "Dieser Mac unterstützt Apple Intelligence nicht (Apple Silicon erforderlich)."
+                return String(localized: "This Mac doesn’t support Apple Intelligence (Apple silicon required).")
             case .appleIntelligenceNotEnabled:
-                return "Apple Intelligence ist deaktiviert (Systemeinstellungen → Apple Intelligence & Siri)."
+                return String(localized: "Apple Intelligence is turned off (System Settings → Apple Intelligence & Siri).")
             case .modelNotReady:
-                return "Das Apple-Intelligence-Modell wird noch geladen. Bitte später erneut versuchen."
+                return String(localized: "The Apple Intelligence model is still loading. Please try again later.")
             @unknown default:
-                return "Apple Intelligence ist derzeit nicht verfügbar."
+                return String(localized: "Apple Intelligence is currently unavailable.")
             }
         @unknown default:
-            return "Apple Intelligence ist derzeit nicht verfügbar."
+            return String(localized: "Apple Intelligence is currently unavailable.")
         }
     }
 
-    /// Zeichen pro Abschnitt – lässt im 4K-Kontext Platz für Anweisungen und Antwort.
+    /// Language code of the app's current localization ("en", "de"), used for summaries and subtitles.
+    static var languageCode: String {
+        let preferred = Bundle.main.preferredLocalizations.first ?? "en"
+        let code = String(preferred.prefix(while: { $0 != "-" && $0 != "_" })).lowercased()
+        return code.isEmpty || code == "base" ? "en" : code
+    }
+
+    /// English name of the output language, e.g. "German", for the model instructions.
+    private static var languageName: String {
+        Locale(identifier: "en").localizedString(forLanguageCode: languageCode) ?? "English"
+    }
+
+    /// Characters per section; leaves room in the 4K context for instructions and the answer.
     private static let chunkLength = 6_000
 
-    private static let noteInstructions = """
-        Du fasst Abschnitte aus Transkripten von YouTube-Videos zusammen. \
-        Antworte ausschließlich auf Deutsch, sachlich und knapp. \
-        Gib nur Stichpunkte zurück, die jeweils mit "- " beginnen. \
-        Erfinde nichts, was nicht im Text steht. Ignoriere Werbung, Sponsoren und Aufrufe zum Abonnieren.
+    private static var noteInstructions: String {
         """
+        You summarize sections of YouTube video transcripts. \
+        Always answer in \(languageName), factually and concisely. \
+        Return only bullet points, each starting with "- ". \
+        Do not invent anything that is not in the text. Ignore ads, sponsors and calls to subscribe.
+        """
+    }
 
-    private static let finalInstructions = """
-        Du schreibst neutrale, kompakte Zusammenfassungen von YouTube-Videos auf Deutsch. \
-        Keine Wertungen, keine Übertreibungen, keine Werbung, keine Aufforderungen. \
-        Verwende keine Überschriften mit #. Erfinde nichts.
+    private static var finalInstructions: String {
         """
+        You write neutral, compact summaries of YouTube videos in \(languageName). \
+        No judgments, no exaggeration, no advertising, no calls to action. \
+        Do not use headings with #. Do not invent anything.
+        """
+    }
 
     static func summarize(title: String, channel: String, text: String, isDescriptionOnly: Bool,
                           progress: @escaping @MainActor (String) -> Void) async throws -> String {
@@ -53,16 +70,16 @@ enum Summarizer {
                 var parts: [String] = []
                 for (index, part) in chunks.enumerated() {
                     try Task.checkCancellation()
-                    await progress("Analysiere Abschnitt \(index + 1) von \(chunks.count)…")
+                    await progress(String(localized: "Analyzing section \(index + 1) of \(chunks.count)…"))
                     parts.append(try await condense(part))
                 }
                 notes = parts.joined(separator: "\n")
 
-                // Bei sehr langen Videos die Notizen in weiteren Runden verdichten.
+                // For very long videos, condense the notes in further rounds.
                 var round = 0
                 while notes.count > chunkLength && round < 3 {
                     try Task.checkCancellation()
-                    await progress("Verdichte Notizen…")
+                    await progress(String(localized: "Condensing notes…"))
                     var merged: [String] = []
                     for part in chunk(notes) { merged.append(try await condense(part)) }
                     notes = merged.joined(separator: "\n")
@@ -71,10 +88,10 @@ enum Summarizer {
             }
 
             try Task.checkCancellation()
-            await progress("Schreibe Zusammenfassung…")
+            await progress(String(localized: "Writing summary…"))
             let source = isDescriptionOnly
-                ? "Videobeschreibung (kein Transkript verfügbar)"
-                : (chunks.count > 1 ? "Notizen aus dem Transkript" : "Transkript")
+                ? "video description (no transcript available)"
+                : (chunks.count > 1 ? "notes taken from the transcript" : "transcript")
 
             do {
                 return try await finalSummary(title: title, channel: channel, source: source, notes: notes)
@@ -87,28 +104,30 @@ enum Summarizer {
         }
     }
 
-    // MARK: - Helfer
+    // MARK: - Helpers
 
     private static func finalSummary(title: String, channel: String, source: String, notes: String) async throws -> String {
+        let summaryLabel = String(localized: "In brief")
+        let keyPointsLabel = String(localized: "Key points")
         let prompt = """
-            Video: "\(title)" von \(channel)
-            Quelle: \(source)
+            Video: "\(title)" by \(channel)
+            Source: \(source)
 
             \(notes)
 
-            Schreibe eine Zusammenfassung auf Deutsch in genau diesem Format:
-            **Kurzfassung:** zwei bis drei Sätze.
+            Write a summary in \(languageName) in exactly this format:
+            **\(summaryLabel):** two to three sentences.
 
-            **Kernpunkte:**
-            - drei bis sieben Stichpunkte
+            **\(keyPointsLabel):**
+            - three to seven bullet points
             """
         return try await respond(prompt, instructions: finalInstructions, maxTokens: 700)
     }
 
-    /// Verdichtet einen Abschnitt zu Stichpunkten; teilt ihn bei Kontextüberlauf rekursiv.
+    /// Condenses a section into bullet points; splits it recursively if the context overflows.
     private static func condense(_ text: String) async throws -> String {
         do {
-            return try await respond("Fasse diesen Abschnitt in höchstens sechs Stichpunkten zusammen:\n\n\(text)",
+            return try await respond("Summarize this section in at most six bullet points:\n\n\(text)",
                                      instructions: noteInstructions, maxTokens: 350)
         } catch let error where isContextOverflow(error) && text.count > 1_000 {
             let middle = text.index(text.startIndex, offsetBy: text.count / 2)
@@ -119,7 +138,7 @@ enum Summarizer {
     }
 
     private static func respond(_ prompt: String, instructions: String, maxTokens: Int) async throws -> String {
-        // Für jeden Schritt eine frische Session, damit sich kein Kontext ansammelt.
+        // A fresh session for every step, so no context piles up.
         let session = LanguageModelSession(instructions: instructions)
         let options = GenerationOptions(temperature: 0.3, maximumResponseTokens: maxTokens)
         let response = try await session.respond(to: prompt, options: options)
@@ -152,11 +171,11 @@ enum Summarizer {
     private static func friendly(_ error: LanguageModelSession.GenerationError) -> Error {
         switch error {
         case .guardrailViolation:
-            return AppError("Apple Intelligence hat die Zusammenfassung aus Sicherheitsgründen abgelehnt.")
+            return AppError(String(localized: "Apple Intelligence declined to summarize this video for safety reasons."))
         case .unsupportedLanguageOrLocale:
-            return AppError("Die Sprache dieses Videos wird von Apple Intelligence nicht unterstützt.")
+            return AppError(String(localized: "This video’s language isn’t supported by Apple Intelligence."))
         case .exceededContextWindowSize:
-            return AppError("Der Text ist zu lang für das lokale Modell.")
+            return AppError(String(localized: "The text is too long for the local model."))
         default:
             return error
         }

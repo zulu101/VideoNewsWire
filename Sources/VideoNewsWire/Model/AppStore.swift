@@ -2,14 +2,14 @@ import AppKit
 import Foundation
 import Observation
 
-/// Zentrale Datenhaltung: Abos, Videos und deren Zustand. Wird als JSON gespeichert.
+/// Central data store: subscriptions, videos and their state. Persisted as JSON.
 @MainActor @Observable
 final class AppStore {
     static let shared = AppStore()
 
     private(set) var channels: [Channel] = []
     private(set) var folders: [Folder] = []
-    /// Lokal gespeicherte Kanalbilder (Kanal-ID → Bild).
+    /// Locally cached channel avatars (channel ID → image).
     private(set) var avatars: [String: NSImage] = AvatarService.loadAll()
     private(set) var videos: [String: Video] = [:]
     private(set) var states: [String: VideoState] = [:]
@@ -25,7 +25,7 @@ final class AppStore {
 
     private struct Library: Codable {
         var channels: [Channel]
-        var folders: [Folder]?   // optional: ältere Bibliotheken haben noch keine Ordner
+        var folders: [Folder]?   // optional: older libraries have no folders yet
         var videos: [Video]
         var states: [String: VideoState]
     }
@@ -36,7 +36,7 @@ final class AppStore {
         load()
     }
 
-    // MARK: Persistenz
+    // MARK: Persistence
 
     private func load() {
         guard let data = try? Data(contentsOf: libraryURL) else { return }
@@ -57,11 +57,11 @@ final class AppStore {
             try FileManager.default.createDirectory(at: libraryURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try encoder.encode(library).write(to: libraryURL, options: .atomic)
         } catch {
-            errorMessage = "Speichern fehlgeschlagen: \(error.localizedDescription)"
+            errorMessage = String(localized: "Saving failed: \(error.localizedDescription)")
         }
     }
 
-    // MARK: Abfragen
+    // MARK: Queries
 
     func state(_ videoID: String) -> VideoState {
         states[videoID] ?? VideoState()
@@ -84,8 +84,8 @@ final class AppStore {
         return URL(fileURLWithPath: path)
     }
 
-    /// Videos für die Seitenleisten-Auswahl. `keeping` hält das gerade geöffnete Video in der Liste,
-    /// auch wenn es durch das Öffnen als gesehen markiert wurde (wie in NetNewsWire).
+    /// Videos for the sidebar selection. `keeping` keeps the currently open video in the list
+    /// even after opening it marked it as watched (like NetNewsWire).
     func videos(for selection: SidebarSelection, hideShorts: Bool, keeping keepID: String? = nil) -> [Video] {
         var list = videos.values.filter { !hideShorts || !$0.isShort || $0.id == keepID }
         switch selection {
@@ -115,7 +115,7 @@ final class AppStore {
         channels.first { $0.id == id }
     }
 
-    // MARK: Aktualisieren
+    // MARK: Refreshing
 
     func refreshAll() async {
         guard !isRefreshing, !channels.isEmpty else { return }
@@ -126,7 +126,7 @@ final class AppStore {
 
         await withTaskGroup(of: (String, Result<FeedService.Feed, Error>).self) { group in
             var iterator = ids.makeIterator()
-            // Höchstens 6 gleichzeitige Anfragen.
+            // At most 6 concurrent requests.
             for _ in 0..<min(6, ids.count) {
                 if let id = iterator.next() {
                     group.addTask { (id, await FeedService.fetchResult(channelID: id)) }
@@ -148,9 +148,9 @@ final class AppStore {
         await refreshAvatars()
     }
 
-    // MARK: Kanalbilder
+    // MARK: Channel avatars
 
-    /// Lädt fehlende Kanalbilder und erneuert sie alle 30 Tage.
+    /// Fetches missing channel avatars and refreshes them every 30 days.
     func refreshAvatars() async {
         let maxAge: TimeInterval = 30 * 24 * 3600
         let due = channels
@@ -194,8 +194,8 @@ final class AppStore {
         }
     }
 
-    /// Beim ersten Abruf eines neuen Kanals werden ältere Videos (> 7 Tage) direkt als gesehen
-    /// markiert – sonst würde „Neu“ mit dem halben Backkatalog geflutet.
+    /// On the first fetch of a new channel, older videos (> 7 days) are marked as watched right away;
+    /// otherwise "New" would be flooded with half the back catalog.
     private func merge(_ newVideos: [Video], initialFetch: Bool) {
         let cutoff = Date().addingTimeInterval(-7 * 24 * 3600)
         for video in newVideos {
@@ -207,7 +207,7 @@ final class AppStore {
         }
     }
 
-    // MARK: Kanäle verwalten
+    // MARK: Managing channels
 
     @discardableResult
     func addChannel(_ input: String) async throws -> Channel {
@@ -222,7 +222,7 @@ final class AppStore {
         return channel
     }
 
-    /// Fügt mehrere Kanäle hinzu (Import) und lädt danach alle Feeds. Liefert die Anzahl neuer Kanäle.
+    /// Adds several channels (import), then fetches all feeds. Returns the number of new channels.
     @discardableResult
     func importChannels(_ list: [(id: String, title: String)]) async -> Int {
         var added = 0
@@ -236,7 +236,7 @@ final class AppStore {
         return added
     }
 
-    /// Import der `subscriptions.csv` aus Google Takeout (Spalten: Kanal-ID, Kanal-URL, Kanaltitel).
+    /// Imports `subscriptions.csv` from Google Takeout (columns: channel ID, channel URL, channel title).
     func importTakeoutCSV(from url: URL) async throws -> Int {
         let accessing = url.startAccessingSecurityScopedResource()
         defer { if accessing { url.stopAccessingSecurityScopedResource() } }
@@ -248,7 +248,7 @@ final class AppStore {
             let title = fields.last.flatMap { $0.isEmpty ? nil : $0 } ?? id
             found.append((id, title))
         }
-        guard !found.isEmpty else { throw AppError("In der Datei wurden keine Kanäle gefunden.") }
+        guard !found.isEmpty else { throw AppError(String(localized: "No channels were found in the file.")) }
         return await importChannels(found)
     }
 
@@ -256,7 +256,7 @@ final class AppStore {
         channels.removeAll { $0.id == id }
         avatars[id] = nil
         AvatarService.delete(channelID: id)
-        // Gemerkte und heruntergeladene Videos bleiben erhalten.
+        // Saved and downloaded videos are kept.
         for video in videos.values where video.channelID == id {
             let state = state(video.id)
             if !state.saved && state.localFile == nil {
@@ -267,7 +267,7 @@ final class AppStore {
         save()
     }
 
-    // MARK: Ordner
+    // MARK: Folders
 
     func channels(inFolder folderID: UUID?) -> [Channel] {
         channels.filter { $0.folderID == folderID }
@@ -293,7 +293,7 @@ final class AppStore {
         save()
     }
 
-    /// Löscht den Ordner; die enthaltenen Kanäle bleiben abonniert (ohne Ordner).
+    /// Deletes the folder; its channels stay subscribed (without a folder).
     func deleteFolder(_ id: UUID) {
         folders.removeAll { $0.id == id }
         for index in channels.indices where channels[index].folderID == id {
@@ -308,18 +308,18 @@ final class AppStore {
         save()
     }
 
-    // MARK: Reihenfolge
+    // MARK: Order
     //
-    // Die Reihenfolge in der Seitenleiste entspricht der Reihenfolge der Arrays `channels`
-    // und `folders` – sie wird nur noch durch den Nutzer verändert (Drag & Drop, Menü).
+    // The sidebar order is the order of the `channels` and `folders` arrays;
+    // only the user changes it (drag and drop, menu).
 
-    /// Verschiebt einen Kanal in einen Ordner (`nil` = ohne Ordner), ans Ende.
+    /// Moves a channel into a folder (`nil` = no folder), at the end.
     func moveChannel(_ channelID: String, toFolder folderID: UUID?) {
         moveChannel(channelID, toFolder: folderID, at: channels(inFolder: folderID).count)
     }
 
-    /// Legt einen Kanal an Position `index` der Gruppe `folderID` ab, also vor das Element,
-    /// das dort vor dem Verschieben stand (wie die Einfüge-Linie der Liste es anzeigt).
+    /// Places a channel at position `index` of group `folderID`, i.e. before the item that was
+    /// there before the move (as the list's insertion line shows).
     func moveChannel(_ channelID: String, toFolder folderID: UUID?, at index: Int) {
         let group = channels(inFolder: folderID)
         let beforeID = index < group.count ? group[index].id : nil
@@ -329,7 +329,7 @@ final class AppStore {
         if let beforeID, beforeID != channelID, let position = channels.firstIndex(where: { $0.id == beforeID }) {
             channels.insert(channel, at: position)
         } else if beforeID == channelID {
-            channels.insert(channel, at: from)   // an derselben Stelle abgelegt
+            channels.insert(channel, at: from)   // dropped at the same place
         } else if let last = channels.lastIndex(where: { $0.folderID == folderID }) {
             channels.insert(channel, at: last + 1)
         } else {
@@ -338,7 +338,7 @@ final class AppStore {
         save()
     }
 
-    /// Verschiebt einen Kanal innerhalb seiner Gruppe um eine Position nach oben (-1) oder unten (+1).
+    /// Moves a channel within its group one position up (-1) or down (+1).
     func nudgeChannel(_ channelID: String, by offset: Int) {
         guard let channel = channel(channelID) else { return }
         let group = channels(inFolder: channel.folderID)
@@ -347,7 +347,7 @@ final class AppStore {
         moveChannel(channelID, toFolder: channel.folderID, at: offset < 0 ? position - 1 : position + 2)
     }
 
-    /// Legt einen Ordner an Position `index` ab (vor den Ordner, der dort stand).
+    /// Places a folder at position `index` (before the folder that was there).
     func moveFolder(_ folderID: UUID, to index: Int) {
         guard let from = folders.firstIndex(where: { $0.id == folderID }) else { return }
         let beforeID = index < folders.count ? folders[index].id : nil
@@ -368,7 +368,7 @@ final class AppStore {
         save()
     }
 
-    /// Einmalig alphabetisch sortieren (Ordner, und Kanäle innerhalb jeder Gruppe).
+    /// One-off alphabetical sort (folders, and channels within each group).
     func sortAlphabetically() {
         folders.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         channels.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
@@ -391,7 +391,7 @@ final class AppStore {
                 update(video.id) { $0.localFile = url.path }
             } catch is CancellationError {
             } catch {
-                errorMessage = "Download fehlgeschlagen: \(error.localizedDescription)"
+                errorMessage = String(localized: "Download failed: \(error.localizedDescription)")
             }
         }
     }
@@ -405,7 +405,7 @@ final class AppStore {
 }
 
 enum CSV {
-    /// Einfacher CSV-Zeilen-Parser mit Unterstützung für Anführungszeichen.
+    /// Simple CSV line parser with support for quoted fields.
     static func fields(_ line: String) -> [String] {
         var fields: [String] = []
         var current = ""

@@ -1,14 +1,14 @@
 import Foundation
 
-/// Ein abonnierter YouTube-Kanal.
+/// A subscribed YouTube channel.
 struct Channel: Codable, Identifiable, Hashable {
     let id: String              // UC…
     var title: String
     var lastRefreshed: Date? = nil
     var lastError: String? = nil
-    /// Ordner, in dem der Kanal einsortiert ist (`nil` = ohne Ordner).
+    /// Folder the channel is filed in (`nil` = no folder).
     var folderID: UUID? = nil
-    /// Wann das Kanalbild zuletzt geladen wurde.
+    /// When the channel avatar was last fetched.
     var avatarUpdated: Date? = nil
 
     var feedURL: URL {
@@ -20,16 +20,16 @@ struct Channel: Codable, Identifiable, Hashable {
     }
 }
 
-/// Ordner zum Gruppieren von Abos (z. B. „Food“, „Tech“).
+/// Folder for grouping subscriptions (e.g. "Food", "Tech").
 struct Folder: Codable, Identifiable, Hashable {
     var id = UUID()
     var name: String
     var isExpanded = true
 }
 
-/// Ein Video aus dem RSS-Feed eines Kanals.
+/// A video from a channel's RSS feed.
 struct Video: Codable, Identifiable, Hashable {
-    let id: String              // YouTube-Video-ID
+    let id: String              // YouTube video ID
     var channelID: String
     var channelTitle: String
     var title: String
@@ -41,7 +41,7 @@ struct Video: Codable, Identifiable, Hashable {
     var thumbnailURL: URL? { URL(string: "https://i.ytimg.com/vi/\(id)/mqdefault.jpg") }
 }
 
-/// Lokaler Zustand eines Videos (gesehen, gemerkt, heruntergeladen, KI-Zusammenfassung).
+/// Local state of a video (watched, saved, downloaded, AI summary).
 struct VideoState: Codable, Hashable {
     var watched = false
     var saved = false
@@ -54,10 +54,10 @@ enum SmartFeed: String, CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .unwatched: "Neu"
-        case .today: "Heute"
-        case .saved: "Merkliste"
-        case .downloaded: "Downloads"
+        case .unwatched: String(localized: "New")
+        case .today: String(localized: "Today")
+        case .saved: String(localized: "Watch Later")
+        case .downloaded: String(localized: "Downloads")
         }
     }
 
@@ -90,7 +90,7 @@ enum AppPaths {
     }
 }
 
-/// Schlüssel für UserDefaults / @AppStorage.
+/// Keys for UserDefaults / @AppStorage.
 enum Prefs {
     static let hideShorts = "hideShorts"
     static let showThumbnails = "showThumbnails"
@@ -106,8 +106,8 @@ enum Prefs {
     static func registerDefaults() {
         UserDefaults.standard.register(defaults: [
             hideShorts: true,
-            showThumbnails: false,      // Thumbnails sind auf Klicks optimiert – standardmäßig aus
-            showUnreadCounts: false,    // keine roten Zähler, die zum Abarbeiten drängen
+            showThumbnails: false,      // thumbnails are optimized for clicks – off by default
+            showUnreadCounts: false,    // no red counters urging you to clear a backlog
             markWatchedOnOpen: true,
             maxDownloadHeight: 1080,
             autoUpdateYTDLP: true,

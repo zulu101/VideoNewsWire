@@ -1,8 +1,8 @@
 import Foundation
 import Observation
 
-/// Verwaltet eine eigene yt-dlp-Kopie in ~/Library/Application Support/VideoNewsWire/bin
-/// und hält sie automatisch aktuell (YouTube ändert sich häufig, yt-dlp zieht nach).
+/// Manages a private copy of yt-dlp in ~/Library/Application Support/VideoNewsWire/bin
+/// and keeps it up to date (YouTube changes often, yt-dlp follows).
 @MainActor @Observable
 final class YTDLPManager {
     static let shared = YTDLPManager()
@@ -10,7 +10,7 @@ final class YTDLPManager {
     private(set) var version: String?
     private(set) var isBusy = false
     var statusMessage: String?
-    /// Fortschritt laufender Downloads (Video-ID → 0…1).
+    /// Progress of running downloads (video ID → 0…1).
     private(set) var downloadProgress: [String: Double] = [:]
 
     let binaryURL = AppPaths.support.appendingPathComponent("bin/yt-dlp")
@@ -18,7 +18,7 @@ final class YTDLPManager {
 
     var isInstalled: Bool { FileManager.default.isExecutableFile(atPath: binaryURL.path) }
 
-    // MARK: Installation & Updates
+    // MARK: Installation & updates
 
     func refreshVersion() async {
         guard isInstalled else { version = nil; return }
@@ -31,11 +31,11 @@ final class YTDLPManager {
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
-        statusMessage = "Lade yt-dlp herunter…"
+        statusMessage = String(localized: "Downloading yt-dlp…")
         do {
             let (tempURL, response) = try await URLSession.shared.download(from: Self.releaseURL)
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                throw AppError("Download fehlgeschlagen (HTTP \(http.statusCode)).")
+                throw AppError(String(localized: "Download failed (HTTP \(http.statusCode))."))
             }
             let fm = FileManager.default
             try fm.createDirectory(at: binaryURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -44,9 +44,9 @@ final class YTDLPManager {
             try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binaryURL.path)
             UserDefaults.standard.set(Date(), forKey: Prefs.ytdlpLastUpdate)
             await refreshVersion()
-            statusMessage = "yt-dlp \(version ?? "") installiert."
+            statusMessage = String(localized: "yt-dlp \(version ?? "") installed.")
         } catch {
-            statusMessage = "Installation fehlgeschlagen: \(error.localizedDescription)"
+            statusMessage = String(localized: "Installation failed: \(error.localizedDescription)")
         }
     }
 
@@ -55,23 +55,23 @@ final class YTDLPManager {
         guard !isBusy else { return }
         isBusy = true
         defer { isBusy = false }
-        statusMessage = "Suche nach Updates…"
+        statusMessage = String(localized: "Checking for updates…")
         do {
             let result = try await ProcessRunner.run(binaryURL, arguments: ["-U"])
             UserDefaults.standard.set(Date(), forKey: Prefs.ytdlpLastUpdate)
             await refreshVersion()
             if result.succeeded {
                 let last = result.stdout.split(separator: "\n").last.map(String.init) ?? ""
-                statusMessage = last.isEmpty ? "yt-dlp \(version ?? "") ist aktuell." : last
+                statusMessage = last.isEmpty ? String(localized: "yt-dlp \(version ?? "") is up to date.") : last
             } else {
-                statusMessage = "Update fehlgeschlagen: \(result.errorSummary)"
+                statusMessage = String(localized: "Update failed: \(result.errorSummary)")
             }
         } catch {
-            statusMessage = "Update fehlgeschlagen: \(error.localizedDescription)"
+            statusMessage = String(localized: "Update failed: \(error.localizedDescription)")
         }
     }
 
-    /// Prüft beim Start höchstens alle drei Tage auf ein yt-dlp-Update.
+    /// Checks for a yt-dlp update at launch, at most every three days.
     func updateIfNeeded() async {
         await refreshVersion()
         guard isInstalled, UserDefaults.standard.bool(forKey: Prefs.autoUpdateYTDLP) else { return }
@@ -85,7 +85,7 @@ final class YTDLPManager {
 
     func download(_ video: Video, to folder: URL, maxHeight: Int) async throws -> URL {
         guard isInstalled else {
-            throw AppError("yt-dlp ist nicht installiert (Einstellungen → Downloads).")
+            throw AppError(String(localized: "yt-dlp is not installed (Settings → Downloads)."))
         }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
@@ -100,14 +100,14 @@ final class YTDLPManager {
             "-o", folder.path + "/%(channel)s - %(title)s [%(id)s].%(ext)s",
         ]
         if let ffmpeg = ProcessRunner.findTool("ffmpeg") {
-            // Mit ffmpeg: getrennte Video-/Audiospuren in guter Qualität zusammenführen.
+            // With ffmpeg: merge separate high-quality video and audio tracks.
             args += [
                 "--ffmpeg-location", ffmpeg.path,
                 "-f", "bv*[height<=\(maxHeight)][ext=mp4]+ba[ext=m4a]/b[height<=\(maxHeight)][ext=mp4]/b[ext=mp4]/b",
                 "--merge-output-format", "mp4",
             ]
         } else {
-            // Ohne ffmpeg nur kombinierte Formate (meist max. 720p).
+            // Without ffmpeg: combined formats only (usually at most 720p).
             args += ["-f", "b[ext=mp4]/b"]
         }
         args.append(video.watchURL.absoluteString)
@@ -126,15 +126,16 @@ final class YTDLPManager {
         let path = result.stdout
             .split(separator: "\n").map(String.init)
             .last(where: { FileManager.default.fileExists(atPath: $0) })
-        guard let path else { throw AppError("Download beendet, aber Datei nicht gefunden.") }
+        guard let path else { throw AppError(String(localized: "Download finished, but the file was not found.")) }
         return URL(fileURLWithPath: path)
     }
 
-    // MARK: Transkript (für die KI-Zusammenfassung)
+    // MARK: Transcript (for the AI summary)
 
-    /// Lädt Untertitel (bevorzugt die automatischen Original-Untertitel) und liefert reinen Text.
+    /// Downloads subtitles (preferring the automatic original-language ones) and returns plain text.
     func transcript(for videoID: String) async throws -> String? {
         guard isInstalled else { return nil }
+        let language = Summarizer.languageCode
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appendingPathComponent("vnw-subs-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -142,16 +143,16 @@ final class YTDLPManager {
 
         _ = try await ProcessRunner.run(binaryURL, arguments: [
             "--skip-download", "--write-subs", "--write-auto-subs",
-            "--sub-langs", "de-orig,en-orig,.*-orig,de,en",
+            "--sub-langs", "\(language)-orig,en-orig,.*-orig,\(language),en",
             "--sub-format", "vtt", "--no-playlist",
             "-o", dir.path + "/sub.%(ext)s",
             "https://www.youtube.com/watch?v=\(videoID)",
         ])
 
         let files = (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        let preferred = ["de-orig", "en-orig", "de", "en"]
+        let preferred = ["\(language)-orig", "en-orig", language, "en"]
         func rank(_ url: URL) -> Int {
-            // Dateiname: sub.<sprache>.vtt
+            // File name: sub.<language>.vtt
             let lang = url.deletingPathExtension().pathExtension
             if let index = preferred.firstIndex(of: lang) { return index }
             return lang.hasSuffix("-orig") ? 2 : 10
@@ -162,11 +163,11 @@ final class YTDLPManager {
         return text.isEmpty ? nil : text
     }
 
-    // MARK: Kanäle
+    // MARK: Channels
 
-    /// Liest die Abos des im Browser angemeldeten YouTube-Kontos über dessen Cookies aus.
+    /// Reads the subscriptions of the YouTube account signed in in the browser, via its cookies.
     func subscribedChannels(browser: String) async throws -> [(id: String, title: String)] {
-        guard isInstalled else { throw AppError("yt-dlp ist nicht installiert.") }
+        guard isInstalled else { throw AppError(String(localized: "yt-dlp is not installed.")) }
         let result = try await ProcessRunner.run(binaryURL, arguments: [
             "--cookies-from-browser", browser, "--flat-playlist",
             "--print", "%(id)s\t%(channel_id)s\t%(title)s\t%(channel)s",
@@ -181,7 +182,7 @@ final class YTDLPManager {
         }
     }
 
-    /// Fallback zur Kanal-Erkennung, falls das Auslesen der Kanalseite scheitert.
+    /// Fallback for resolving a channel when reading the channel page fails.
     func channelID(for url: String) async throws -> String? {
         guard isInstalled else { return nil }
         let result = try await ProcessRunner.run(binaryURL, arguments: [
@@ -195,8 +196,8 @@ final class YTDLPManager {
     }
 }
 
-/// Wandelt WebVTT-Untertitel in Fließtext um (inkl. Entfernen der rollenden Duplikate
-/// bei automatischen YouTube-Untertiteln).
+/// Converts WebVTT subtitles into running text (including removing the rolling duplicates
+/// in YouTube's automatic subtitles).
 enum VTT {
     static func plainText(_ raw: String) -> String {
         var output: [String] = []

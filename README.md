@@ -30,6 +30,8 @@ Requires **macOS 26 on Apple silicon** (see [Requirements](#requirements)).
 | **Download** | Via yt-dlp; the app **installs and updates yt-dlp itself** (every 3 days at launch, or manually). Downloaded videos play locally with AVKit |
 | **Import subscriptions** | Manually (URL, @handle, channel ID), from your YouTube account (yt-dlp reads your subscriptions via your browser's cookies) or from a Google Takeout `subscriptions.csv` |
 
+**Languages:** English and German. The app follows your macOS language; AI summaries are written in the same language.
+
 ### Designed against distraction
 
 - **No thumbnails** by default (can be turned on in Settings): you pick by title, not by clickbait image.
@@ -75,6 +77,10 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+### Translations
+
+English strings in the source code are the keys; translations live in `Resources/<language>.lproj/Localizable.strings` (currently German in `de.lproj`). To add a language, copy `de.lproj`, translate the right-hand side of each line, and add the language code to `CFBundleLocalizations` in `Scripts/build-app.sh`. When running via `swift run` (without an app bundle), the app is always English.
+
 ## App icon
 
 The source is `Resources/AppIcon.svg`. After editing the SVG, regenerate the icon:
@@ -117,7 +123,7 @@ Sources/VideoNewsWire/
 - Hiding player elements relies on YouTube's CSS class names and may need updates when YouTube changes them.
 - Fetching many subtitles in a short time can get rate-limited by YouTube (HTTP 429).
 - Channel avatars are read from the channel page (`og:image`), cached locally and refreshed every 30 days.
-- The app's interface and AI summaries are currently in German. The local model's summaries are good for an overview but not flawless.
+- The local model's summaries are good for an overview but not flawless.
 
 ## Disclaimer
 

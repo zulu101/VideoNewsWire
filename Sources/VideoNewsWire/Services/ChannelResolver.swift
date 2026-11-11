@@ -1,6 +1,6 @@
 import Foundation
 
-/// Ermittelt aus einer Eingabe (URL, @Handle, Kanal-ID, Video-URL) die Kanal-ID (UC…).
+/// Resolves an input (URL, @handle, channel ID, video URL) to a channel ID (UC…).
 @MainActor
 enum ChannelResolver {
     nonisolated static func isChannelID(_ string: String) -> Bool {
@@ -9,7 +9,7 @@ enum ChannelResolver {
 
     static func resolve(_ input: String) async throws -> String {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw AppError("Bitte eine Kanal-URL, ein @Handle oder eine Kanal-ID eingeben.") }
+        guard !trimmed.isEmpty else { throw AppError(String(localized: "Please enter a channel URL, an @handle or a channel ID.")) }
 
         if isChannelID(trimmed) { return trimmed }
         if let match = trimmed.firstMatch(of: #/\/channel\/(UC[A-Za-z0-9_-]{22})/#) {
@@ -19,7 +19,7 @@ enum ChannelResolver {
         let url = try pageURL(for: trimmed)
         if let id = try? await scrape(url) { return id }
         if let id = try? await YTDLPManager.shared.channelID(for: url.absoluteString) { return id }
-        throw AppError("Kanal nicht gefunden. Tipp: Kanal-URL aus dem Browser kopieren.")
+        throw AppError(String(localized: "Channel not found. Tip: copy the channel URL from your browser."))
     }
 
     private static func pageURL(for input: String) throws -> URL {
@@ -33,26 +33,26 @@ enum ChannelResolver {
         }
         guard let url = URL(string: string), let host = url.host?.lowercased(),
               host.hasSuffix("youtube.com") || host == "youtu.be" else {
-            throw AppError("Das sieht nicht nach einer YouTube-Adresse aus.")
+            throw AppError(String(localized: "That doesn’t look like a YouTube address."))
         }
         return url
     }
 
-    /// Lädt eine YouTube-Seite als HTML (ohne EU-Cookie-Einwilligungsseite).
+    /// Loads a YouTube page as HTML (bypassing the EU cookie consent page).
     nonisolated static func fetchPage(_ url: URL) async throws -> String {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.httpShouldHandleCookies = false
-        // Umgeht die EU-Cookie-Einwilligungsseite.
+        // Bypasses the EU cookie consent page.
         request.setValue("SOCS=CAI; CONSENT=YES+cb", forHTTPHeaderField: "Cookie")
-        request.setValue("de-DE,de;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
+        request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
                          forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw AppError("Seite nicht erreichbar (HTTP \(http.statusCode)).")
+            throw AppError(String(localized: "Page not reachable (HTTP \(http.statusCode))."))
         }
-        guard let html = String(data: data, encoding: .utf8) else { throw AppError("Seite konnte nicht gelesen werden.") }
+        guard let html = String(data: data, encoding: .utf8) else { throw AppError(String(localized: "The page could not be read.")) }
         return html
     }
 

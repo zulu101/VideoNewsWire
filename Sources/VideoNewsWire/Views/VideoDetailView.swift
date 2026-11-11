@@ -42,7 +42,7 @@ struct VideoDetailView: View {
                 }
 
                 if !video.descriptionText.isEmpty {
-                    DisclosureGroup("Beschreibung", isExpanded: $showDescription) {
+                    DisclosureGroup("Description", isExpanded: $showDescription) {
                         Text(video.descriptionText)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,23 +65,23 @@ struct VideoDetailView: View {
         }
     }
 
-    // MARK: Aktionen
+    // MARK: Actions
 
     private func actionBar(_ state: VideoState) -> some View {
         HStack(spacing: 8) {
-            Button(state.watched ? "Als neu markieren" : "Gesehen",
+            Button(state.watched ? String(localized: "Mark as New") : String(localized: "Watched"),
                    systemImage: state.watched ? "circle" : "checkmark.circle") {
                 store.update(video.id) { $0.watched.toggle() }
             }
 
-            Button(state.saved ? "Gemerkt" : "Merken",
+            Button(state.saved ? String(localized: "Saved") : String(localized: "Save for Later"),
                    systemImage: state.saved ? "bookmark.fill" : "bookmark") {
                 store.update(video.id) { $0.saved.toggle() }
             }
 
             downloadControl
 
-            Button(showSummary && state.aiSummary != nil ? "Zusammenfassung ausblenden" : "KI-Zusammenfassung",
+            Button(showSummary && state.aiSummary != nil ? String(localized: "Hide Summary") : String(localized: "AI Summary"),
                    systemImage: "sparkles") {
                 toggleSummary()
             }
@@ -92,7 +92,7 @@ struct VideoDetailView: View {
             ShareLink(item: video.watchURL) {
                 Image(systemName: "square.and.arrow.up")
             }
-            .help("Link teilen")
+            .help("Share link")
         }
         .buttonStyle(.bordered)
     }
@@ -106,28 +106,28 @@ struct VideoDetailView: View {
                     .foregroundStyle(.secondary)
             }
         } else if let file = store.localFileURL(for: video.id) {
-            Button("Im Finder", systemImage: "folder") {
+            Button("Show in Finder", systemImage: "folder") {
                 NSWorkspace.shared.activateFileViewerSelecting([file])
             }
         } else {
-            Button("Herunterladen", systemImage: "arrow.down.circle") {
+            Button("Download", systemImage: "arrow.down.circle") {
                 store.download(video)
             }
             .disabled(!ytdlp.isInstalled)
-            .help(ytdlp.isInstalled ? "Mit yt-dlp herunterladen" : "yt-dlp in den Einstellungen installieren")
+            .help(ytdlp.isInstalled ? String(localized: "Download with yt-dlp") : String(localized: "Install yt-dlp in Settings"))
         }
     }
 
-    // MARK: Zusammenfassung
+    // MARK: Summary
 
     private func summarySection(_ state: VideoState) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("Zusammenfassung", systemImage: "sparkles").font(.headline)
+                    Label("Summary", systemImage: "sparkles").font(.headline)
                     Spacer()
                     if state.aiSummary != nil && !isSummarizing {
-                        Button("Neu erstellen") { generateSummary() }
+                        Button("Regenerate") { generateSummary() }
                             .buttonStyle(.link)
                     }
                 }
@@ -136,7 +136,7 @@ struct VideoDetailView: View {
                         ProgressView().controlSize(.small)
                         Text(summaryStatus).foregroundStyle(.secondary)
                         Spacer()
-                        Button("Abbrechen") { summaryTask?.cancel() }
+                        Button("Cancel") { summaryTask?.cancel() }
                             .buttonStyle(.link)
                     }
                 } else if let error = summaryError {
@@ -147,7 +147,7 @@ struct VideoDetailView: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Text("Erstellt auf diesem Mac mit Apple Intelligence – kann Fehler enthalten.")
+                Text("Created on this Mac with Apple Intelligence – may contain mistakes.")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -175,7 +175,7 @@ struct VideoDetailView: View {
         summaryTask = Task {
             defer { isSummarizing = false }
             do {
-                summaryStatus = "Lade Transkript…"
+                summaryStatus = String(localized: "Loading transcript…")
                 var source = ""
                 if ytdlp.isInstalled {
                     source = (try? await ytdlp.transcript(for: video.id)) ?? ""
@@ -187,8 +187,8 @@ struct VideoDetailView: View {
                 }
                 guard source.count >= 80 else {
                     throw AppError(ytdlp.isInstalled
-                        ? "Für dieses Video gibt es weder Untertitel noch eine brauchbare Beschreibung."
-                        : "Für Transkripte wird yt-dlp benötigt (Einstellungen → Downloads).")
+                        ? String(localized: "This video has neither subtitles nor a usable description.")
+                        : String(localized: "Transcripts require yt-dlp (Settings → Downloads)."))
                 }
                 let summary = try await Summarizer.summarize(
                     title: video.title, channel: video.channelTitle,
@@ -198,7 +198,7 @@ struct VideoDetailView: View {
                 }
                 store.update(video.id) { $0.aiSummary = summary }
             } catch is CancellationError {
-                summaryError = "Abgebrochen."
+                summaryError = String(localized: "Cancelled.")
             } catch {
                 summaryError = error.localizedDescription
             }

@@ -2,15 +2,15 @@ import AVKit
 import SwiftUI
 import WebKit
 
-/// Eingebetteter YouTube-Player (youtube-nocookie.com) ohne Empfehlungen, Endscreens,
-/// Info-Karten und ohne Möglichkeit, aus dem Player heraus zu YouTube zu navigieren.
+/// Embedded YouTube player (youtube-nocookie.com) without recommendations, end screens
+/// or info cards, and without a way to navigate from the player to YouTube.
 struct YouTubePlayerView: NSViewRepresentable {
     let videoID: String
 
-    /// YouTube verlangt für Embeds einen Referer (sonst Fehler 153). Wir geben die App als Herkunft an.
+    /// YouTube requires a Referer for embeds (otherwise error 153). We pass the app as the origin.
     static let baseURL = URL(string: "https://de.videonewswire.app")!
 
-    /// Blendet ablenkende Elemente im Player aus. Wird auch in den iframe injiziert.
+    /// Hides distracting elements in the player. Also injected into the iframe.
     static let hideDistractionsCSS = """
         .ytp-endscreen-content, .ytp-ce-element, .ytp-pause-overlay, .ytp-pause-overlay-container,
         .ytp-related-on-error-overlay, .ytp-suggestion-set, .videowall-endscreen, .html5-endscreen,
@@ -55,7 +55,7 @@ struct YouTubePlayerView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
-        webView.loadHTMLString("", baseURL: nil)  // Wiedergabe stoppen
+        webView.loadHTMLString("", baseURL: nil)  // stop playback
     }
 
     private func load(_ webView: WKWebView, coordinator: Coordinator) {
@@ -81,11 +81,11 @@ struct YouTubePlayerView: NSViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var loadedID: String?
 
-        /// Nur die eigene Seite im Hauptframe zulassen – Klicks auf YouTube-Links führen nirgendwohin.
+        /// Allow only our own page in the main frame; clicks on YouTube links lead nowhere.
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard navigationAction.targetFrame?.isMainFrame == true else {
-                // iframe-Navigation (der Player selbst) ist erlaubt, Pop-ups (targetFrame == nil) nicht.
+                // iframe navigation (the player itself) is allowed, pop-ups (targetFrame == nil) are not.
                 decisionHandler(navigationAction.targetFrame == nil ? .cancel : .allow)
                 return
             }
@@ -96,12 +96,12 @@ struct YouTubePlayerView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            nil  // keine neuen Fenster
+            nil  // no new windows
         }
     }
 }
 
-/// Wiedergabe einer heruntergeladenen Datei – komplett offline und werbefrei.
+/// Playback of a downloaded file: fully offline and ad-free.
 struct LocalPlayerView: NSViewRepresentable {
     let url: URL
 
