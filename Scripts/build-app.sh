@@ -30,6 +30,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSApplicationCategoryType</key><string>public.app-category.video</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>NSHumanReadableCopyright</key><string>© 2026 zulu101 · MIT-Lizenz</string>
 </dict>
 </plist>
 PLIST

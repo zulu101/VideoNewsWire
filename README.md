@@ -2,6 +2,20 @@
 
 Ein ruhiger YouTube-Client für macOS – aufgebaut wie [NetNewsWire](https://netnewswire.com): **Abos links, Videos in der Mitte, Video rechts.** Keine Startseite, keine Empfehlungen, keine Kommentare, keine Shorts, kein Autoplay. Einfach den Kanälen folgen, die man ausgewählt hat.
 
+![App-Icon](Resources/AppIcon.iconset/icon_128.png)
+
+## Installation
+
+1. Die neueste `VideoNewsWire-x.y.z.zip` unter [**Releases**](https://github.com/zulu101/VideoNewsWire/releases/latest) herunterladen.
+2. Entpacken und `VideoNewsWire.app` in den Ordner **Programme** ziehen.
+3. Die App ist (noch) nicht von Apple notarisiert. Beim ersten Start deshalb einmalig im Terminal:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/VideoNewsWire.app
+   ```
+   Alternativ: Start versuchen, dann *Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“*.
+
+Voraussetzung: **macOS 26 auf Apple Silicon** (siehe [Voraussetzungen](#voraussetzungen)).
+
 ## Funktionen
 
 | Bereich | Umsetzung |
@@ -50,10 +64,15 @@ swift run
 
 Alternativ `Package.swift` in Xcode öffnen und ausführen.
 
-Jeder Push baut die App außerdem per GitHub Actions (`macos-26`-Runner); das fertige `VideoNewsWire.zip` liegt unter *Actions → Build → Artifacts*. Da die App nur ad-hoc signiert ist, nach dem Entpacken einmalig:
+Jeder Push baut die App außerdem per GitHub Actions (`macos-26`-Runner); das fertige `VideoNewsWire.zip` liegt unter *Actions → Build → Artifacts*.
+
+### Neue Version veröffentlichen
+
+Ein Versions-Tag erzeugt automatisch ein GitHub-Release mit der fertigen App (`.github/workflows/release.yml`):
 
 ```bash
-xattr -dr com.apple.quarantine VideoNewsWire.app
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 ## App-Icon
@@ -99,3 +118,13 @@ Sources/VideoNewsWire/
 - Viele Untertitel-Abrufe in kurzer Zeit können von YouTube gedrosselt werden (HTTP 429).
 - Kanalbilder werden von der Kanalseite gelesen (`og:image`), lokal gespeichert und alle 30 Tage erneuert.
 - Zusammenfassungen sind auf Deutsch; die Qualität des lokalen Modells ist gut für Überblicke, aber nicht fehlerfrei.
+
+## Hinweise
+
+- VideoNewsWire ist ein unabhängiges Hobbyprojekt und steht in keiner Verbindung zu YouTube, Google oder dem NetNewsWire-Projekt. „YouTube“ ist eine Marke von Google LLC.
+- Die App nutzt die öffentlichen RSS-Feeds und den offiziellen eingebetteten Player von YouTube. Downloads laufen über das separate Open-Source-Werkzeug [yt-dlp](https://github.com/yt-dlp/yt-dlp). Lade nur Inhalte herunter, für die du die Rechte hast, und beachte die Nutzungsbedingungen von YouTube.
+- Alle Daten (Abos, Zustand, Zusammenfassungen) bleiben lokal auf deinem Mac; es gibt keinen eigenen Server und kein Tracking.
+
+## Lizenz
+
+[MIT](LICENSE) © 2026 zulu101
