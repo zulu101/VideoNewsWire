@@ -1,130 +1,130 @@
 # VideoNewsWire
 
-Ein ruhiger YouTube-Client für macOS – aufgebaut wie [NetNewsWire](https://netnewswire.com): **Abos links, Videos in der Mitte, Video rechts.** Keine Startseite, keine Empfehlungen, keine Kommentare, keine Shorts, kein Autoplay. Einfach den Kanälen folgen, die man ausgewählt hat.
+A calm YouTube client for macOS, laid out like [NetNewsWire](https://netnewswire.com): **subscriptions on the left, videos in the middle, the video on the right.** No home feed, no recommendations, no comments, no Shorts, no autoplay. Just follow the channels you chose.
 
-![App-Icon](Resources/AppIcon.iconset/icon_128.png)
+![App icon](Resources/AppIcon.iconset/icon_128.png)
 
 ## Installation
 
-1. Die neueste `VideoNewsWire-x.y.z.zip` unter [**Releases**](https://github.com/zulu101/VideoNewsWire/releases/latest) herunterladen.
-2. Entpacken und `VideoNewsWire.app` in den Ordner **Programme** ziehen.
-3. Die App ist (noch) nicht von Apple notarisiert. Beim ersten Start deshalb einmalig im Terminal:
+1. Download the latest `VideoNewsWire-x.y.z.zip` from [**Releases**](https://github.com/zulu101/VideoNewsWire/releases/latest).
+2. Unzip it and drag `VideoNewsWire.app` into your **Applications** folder.
+3. The app is not notarized by Apple (yet). Before the first launch, run this once in Terminal:
    ```bash
    xattr -dr com.apple.quarantine /Applications/VideoNewsWire.app
    ```
-   Alternativ: Start versuchen, dann *Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“*.
+   Alternatively, try to open it, then go to *System Settings → Privacy & Security → Open Anyway*.
 
-Voraussetzung: **macOS 26 auf Apple Silicon** (siehe [Voraussetzungen](#voraussetzungen)).
+Requires **macOS 26 on Apple silicon** (see [Requirements](#requirements)).
 
-## Funktionen
+## Features
 
-| Bereich | Umsetzung |
+| Area | What it does |
 |---|---|
-| **Seitenleiste** | Übersicht (Neu · Heute · Merkliste · Downloads), **Ordner** (z. B. Food, Tech) und alle abonnierten Kanäle mit ihrem **Kanalbild** |
-| **Ordner** | ⇧⌘N oder Rechtsklick → „Neuer Ordner…“; Kanäle per Drag & Drop oder Kontextmenü einsortieren; Klick auf den Ordner zeigt alle Videos seiner Kanäle |
-| **Eigene Reihenfolge** | Kanäle und Ordner per Drag & Drop anordnen – eine Linie zeigt, wo das Element landet; auf einen Ordnernamen ziehen = in den Ordner oder per Rechtsklick „Nach oben/unten“. Einmalig alphabetisch sortieren: Rechtsklick → „Alphabetisch sortieren“ |
-| **Videoliste** | Neueste Videos pro Kanal aus den öffentlichen YouTube-RSS-Feeds, „Alle als gesehen markieren“ |
-| **Suche** | Durchsucht Titel, Kanalname, **Videobeschreibung** und vorhandene KI-Zusammenfassungen; mehrere Wörter müssen alle vorkommen |
-| **Player** | Eingebettet über `youtube-nocookie.com`; Endscreens, Info-Karten, Pause-Empfehlungen, YouTube-Logo-Link usw. per CSS ausgeblendet; Navigation aus dem Player heraus blockiert |
-| **KI-Zusammenfassung** | Auf Knopfdruck, **on-device mit Apple Foundation Models** (Apple Intelligence). Grundlage: Untertitel/Transkript via yt-dlp, ersatzweise die Videobeschreibung. Lange Videos werden abschnittsweise verdichtet (Map-Reduce), weil das lokale Modell nur ca. 4 096 Tokens Kontext hat |
-| **Download** | Über yt-dlp; die App installiert und **aktualisiert yt-dlp selbst** (alle 3 Tage beim Start oder manuell). Heruntergeladene Videos werden lokal mit AVKit abgespielt |
-| **Abos importieren** | Manuell (URL, @Handle, Kanal-ID), aus dem YouTube-Konto (yt-dlp liest die Abos über die Browser-Cookies) oder per Google-Takeout-`subscriptions.csv` |
+| **Sidebar** | Smart feeds (New · Today · Watch Later · Downloads), **folders** (e.g. Food, Tech) and all subscribed channels with their **channel avatar** |
+| **Folders** | ⇧⌘N or right-click → “New Folder…”; move channels in via drag and drop or the context menu; selecting a folder shows the videos of all its channels |
+| **Custom order** | Arrange channels and folders by drag and drop: a line shows where the item will land; drop onto a folder name to move a channel into it. Or right-click → “Move Up/Down”. One-off alphabetical sort: right-click → “Sort Alphabetically” |
+| **Video list** | Latest videos per channel from YouTube's public RSS feeds, “Mark All as Watched” |
+| **Search** | Matches title, channel name, **video description** and existing AI summaries; with several words, all must match |
+| **Player** | Embedded via `youtube-nocookie.com`; end screens, info cards, pause overlays, the YouTube logo link etc. are hidden via CSS; navigating away from the player is blocked |
+| **AI summary** | On demand, **on-device with Apple Foundation Models** (Apple Intelligence). Based on the subtitles/transcript via yt-dlp, falling back to the video description. Long videos are condensed section by section (map-reduce), because the local model has a context window of only about 4,096 tokens |
+| **Download** | Via yt-dlp; the app **installs and updates yt-dlp itself** (every 3 days at launch, or manually). Downloaded videos play locally with AVKit |
+| **Import subscriptions** | Manually (URL, @handle, channel ID), from your YouTube account (yt-dlp reads your subscriptions via your browser's cookies) or from a Google Takeout `subscriptions.csv` |
 
-### Anti-Ablenkungs-Entscheidungen
+### Designed against distraction
 
-- **Keine Thumbnails** standardmäßig (in den Einstellungen zuschaltbar) – man wählt nach Titel, nicht nach Clickbait-Bild.
-- **Keine Zähler** für Ungesehenes standardmäßig – keine roten Zahlen, die zum Abarbeiten drängen.
-- **Shorts ausgeblendet** (zuschaltbar).
-- **Kein Autoplay**, keine „nächstes Video“-Funktion, keine Kommentare, keine Empfehlungen.
-- Neue Kanäle fluten „Neu“ nicht: Videos älter als 7 Tage gelten beim ersten Abruf als gesehen.
-- Leere „Neu“-Liste sagt: *„Keine neuen Videos. Zeit für etwas anderes.“*
-- Kein Login bei Google nötig; der Player läuft in einem nicht-persistenten Web-Datenspeicher.
+- **No thumbnails** by default (can be turned on in Settings): you pick by title, not by clickbait image.
+- **No unread counters** by default: no red numbers urging you to clear a backlog.
+- **Shorts hidden** (can be turned on).
+- **No autoplay**, no “next video”, no comments, no recommendations.
+- New channels don't flood “New”: videos older than 7 days are marked as watched on the first fetch.
+- An empty “New” list says: *“No new videos. Time for something else.”*
+- No Google sign-in required; the player runs in a non-persistent web data store.
 
-## Voraussetzungen
+## Requirements
 
-- **macOS 26 (Tahoe)** auf **Apple Silicon** (Foundation Models)
-- Apple Intelligence aktiviert (nur für die Zusammenfassungen)
-- Xcode 26 bzw. Swift 6.2 zum Bauen
+- **macOS 26 (Tahoe)** on **Apple silicon** (for Foundation Models)
+- Apple Intelligence turned on (only needed for summaries)
+- Xcode 26 / Swift 6.2 to build from source
 - Optional: `brew install ffmpeg deno`
-  - **ffmpeg**: Downloads über 720p (Video- und Tonspur werden zusammengeführt)
-  - **deno**: von yt-dlp inzwischen empfohlene JavaScript-Laufzeit, damit alle YouTube-Formate verfügbar sind
+  - **ffmpeg**: downloads above 720p (merges video and audio tracks)
+  - **deno**: JavaScript runtime recommended by yt-dlp so that all YouTube formats are available
 
-## Bauen & Starten
+## Building from source
 
 ```bash
 git clone https://github.com/zulu101/VideoNewsWire.git
 cd VideoNewsWire
 
-# Direkt starten (Entwicklung)
+# Run directly (development)
 swift run
 
-# Oder als .app bauen → build/VideoNewsWire.app
+# Or build the app bundle → build/VideoNewsWire.app
 ./Scripts/build-app.sh
 ```
 
-Alternativ `Package.swift` in Xcode öffnen und ausführen.
+You can also open `Package.swift` in Xcode and run it from there.
 
-Jeder Push baut die App außerdem per GitHub Actions (`macos-26`-Runner); das fertige `VideoNewsWire.zip` liegt unter *Actions → Build → Artifacts*.
+Every push is built by GitHub Actions on a `macos-26` runner; the resulting `VideoNewsWire.zip` is available under *Actions → Build → Artifacts*.
 
-### Neue Version veröffentlichen
+### Publishing a new version
 
-Ein Versions-Tag erzeugt automatisch ein GitHub-Release mit der fertigen App (`.github/workflows/release.yml`):
+Pushing a version tag creates a GitHub release with the built app automatically (`.github/workflows/release.yml`):
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-## App-Icon
+## App icon
 
-Quelle ist `Resources/AppIcon.svg` (entworfen in Claude Design, Konzept „Zeitung & Play“). Nach Änderungen am SVG neu erzeugen:
+The source is `Resources/AppIcon.svg`. After editing the SVG, regenerate the icon:
 
 ```bash
-node Scripts/make-icon.mjs   # schreibt Resources/AppIcon.icns und PNGs nach Resources/AppIcon.iconset/
+node Scripts/make-icon.mjs   # writes Resources/AppIcon.icns and PNGs to Resources/AppIcon.iconset/
 ```
 
-Das Skript braucht Playwright mit Chromium (`npm i -g playwright && npx playwright install chromium`).
+The script needs Playwright with Chromium (`npm i -g playwright && npx playwright install chromium`).
 
-## Erste Schritte
+## Getting started
 
-1. **Einstellungen → Downloads → „yt-dlp installieren“** (für Downloads, Transkripte und den Konto-Import).
-2. **⌘N** → Kanal hinzufügen oder Abos aus dem YouTube-Konto übernehmen.
-   - Für den Konto-Import über **Safari** braucht die App *Festplattenvollzugriff* (Systemeinstellungen → Datenschutz & Sicherheit), weil yt-dlp die Safari-Cookies lesen muss. Chrome/Firefox/Brave funktionieren ohne.
-3. **⌘R** aktualisiert alle Kanäle.
+1. **Settings → Downloads → “Install yt-dlp”** (needed for downloads, transcripts and account import).
+2. **⌘N** → add a channel or import the subscriptions from your YouTube account.
+   - Importing via **Safari** requires *Full Disk Access* for the app (System Settings → Privacy & Security), because yt-dlp has to read Safari's cookies. Chrome, Firefox and Brave work without it.
+3. **⌘R** refreshes all channels.
 
-## Aufbau des Codes
+## Code structure
 
 ```
 Sources/VideoNewsWire/
-├── VideoNewsWireApp.swift      App, Menübefehle, Einstellungsfenster
+├── VideoNewsWireApp.swift      App, menu commands, settings window
 ├── Model/
-│   ├── Models.swift            Channel, Video, VideoState, Einstellungs-Schlüssel
-│   └── AppStore.swift          Datenhaltung (JSON in ~/Library/Application Support/VideoNewsWire)
+│   ├── Models.swift            Channel, Folder, Video, VideoState, settings keys
+│   └── AppStore.swift          Persistence (JSON in ~/Library/Application Support/VideoNewsWire)
 ├── Services/
-│   ├── FeedService.swift       YouTube-RSS laden & parsen
-│   ├── ChannelResolver.swift   @Handle/URL → Kanal-ID
-│   ├── AvatarService.swift     Kanalbilder laden & lokal speichern
-│   ├── YTDLPManager.swift      yt-dlp installieren/aktualisieren, Download, Untertitel, Konto-Abos
-│   ├── ProcessRunner.swift     externe Prozesse asynchron ausführen
-│   └── Summarizer.swift        Zusammenfassung mit FoundationModels (Map-Reduce)
-└── Views/                      SwiftUI: Seitenleiste, Liste, Detail, Player, Sheets, Einstellungen
+│   ├── FeedService.swift       Load & parse YouTube RSS feeds
+│   ├── ChannelResolver.swift   @handle/URL → channel ID
+│   ├── AvatarService.swift     Fetch & cache channel avatars
+│   ├── YTDLPManager.swift      Install/update yt-dlp, downloads, subtitles, account subscriptions
+│   ├── ProcessRunner.swift     Run external processes asynchronously
+│   └── Summarizer.swift        Summaries with Foundation Models (map-reduce)
+└── Views/                      SwiftUI: sidebar, list, detail, player, sheets, settings
 ```
 
-## Bekannte Grenzen
+## Known limitations
 
-- Die YouTube-RSS-Feeds enthalten nur die **letzten 15 Videos** pro Kanal und keine Videolänge.
-- YouTube-Feeds sind gelegentlich kurzzeitig nicht erreichbar; betroffene Kanäle zeigen ein ⚠️ in der Seitenleiste.
-- Das Ausblenden von Player-Elementen hängt von YouTubes CSS-Klassen ab und kann nach Änderungen bei YouTube Nachbesserung brauchen.
-- Viele Untertitel-Abrufe in kurzer Zeit können von YouTube gedrosselt werden (HTTP 429).
-- Kanalbilder werden von der Kanalseite gelesen (`og:image`), lokal gespeichert und alle 30 Tage erneuert.
-- Zusammenfassungen sind auf Deutsch; die Qualität des lokalen Modells ist gut für Überblicke, aber nicht fehlerfrei.
+- YouTube's RSS feeds only contain the **latest 15 videos** per channel and no video duration.
+- YouTube feeds are occasionally unavailable for a short time; affected channels show a ⚠️ in the sidebar.
+- Hiding player elements relies on YouTube's CSS class names and may need updates when YouTube changes them.
+- Fetching many subtitles in a short time can get rate-limited by YouTube (HTTP 429).
+- Channel avatars are read from the channel page (`og:image`), cached locally and refreshed every 30 days.
+- The app's interface and AI summaries are currently in German. The local model's summaries are good for an overview but not flawless.
 
-## Hinweise
+## Disclaimer
 
-- VideoNewsWire ist ein unabhängiges Hobbyprojekt und steht in keiner Verbindung zu YouTube, Google oder dem NetNewsWire-Projekt. „YouTube“ ist eine Marke von Google LLC.
-- Die App nutzt die öffentlichen RSS-Feeds und den offiziellen eingebetteten Player von YouTube. Downloads laufen über das separate Open-Source-Werkzeug [yt-dlp](https://github.com/yt-dlp/yt-dlp). Lade nur Inhalte herunter, für die du die Rechte hast, und beachte die Nutzungsbedingungen von YouTube.
-- Alle Daten (Abos, Zustand, Zusammenfassungen) bleiben lokal auf deinem Mac; es gibt keinen eigenen Server und kein Tracking.
+- VideoNewsWire is an independent hobby project and is not affiliated with YouTube, Google or the NetNewsWire project. “YouTube” is a trademark of Google LLC.
+- The app uses YouTube's public RSS feeds and the official embedded player. Downloads use the separate open-source tool [yt-dlp](https://github.com/yt-dlp/yt-dlp). Only download content you have the rights to, and respect YouTube's Terms of Service.
+- All data (subscriptions, state, summaries) stays on your Mac; there is no server and no tracking.
 
-## Lizenz
+## License
 
 [MIT](LICENSE) © 2026 zulu101

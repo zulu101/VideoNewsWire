@@ -11,13 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Swift-Version
+      - name: Swift version
         run: swift --version
 
-      - name: App bauen
+      - name: Build app
         run: ./Scripts/build-app.sh
 
-      - name: App zippen
+      - name: Zip app
         run: ditto -c -k --keepParent build/VideoNewsWire.app build/VideoNewsWire.zip
 
       - uses: actions/upload-artifact@v4

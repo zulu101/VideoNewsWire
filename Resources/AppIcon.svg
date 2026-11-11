@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
-  <!-- VideoNewsWire App-Icon (Konzept B „Zeitung & Play“, angepasste Farben).
-       macOS-Raster: 824 × 824 px Grundform in 1024 × 1024 px Fläche. -->
+  <!-- VideoNewsWire app icon ("newspaper & play").
+       macOS grid: 824 × 824 px shape on a 1024 × 1024 px canvas. -->
   <defs>
     <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#1A1F26" flood-opacity="0.32"/>

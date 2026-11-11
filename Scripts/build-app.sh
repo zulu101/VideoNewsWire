@@ -1,5 +1,5 @@
 #!/bin/bash
-# Baut VideoNewsWire.app (Release, Apple Silicon) nach ./build/
+# Builds VideoNewsWire.app (release, Apple silicon) into ./build/
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,12 +30,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSApplicationCategoryType</key><string>public.app-category.video</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
-    <key>NSHumanReadableCopyright</key><string>© 2026 zulu101 · MIT-Lizenz</string>
+    <key>NSHumanReadableCopyright</key><string>© 2026 zulu101 · MIT License</string>
 </dict>
 </plist>
 PLIST
 
-# Ad-hoc-Signatur (für lokale Nutzung ausreichend)
+# Ad-hoc signature (sufficient for local use)
 codesign --force --deep --sign - "$APP"
 
-echo "Fertig: $APP"
+echo "Done: $APP"
