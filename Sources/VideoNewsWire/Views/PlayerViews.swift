@@ -23,7 +23,7 @@ struct YouTubePlayerView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeNSView(context: Context) -> WKWebView {
+    func makeNSView(context: Context) -> PlayerContainerView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.preferences.isElementFullscreenEnabled = true
@@ -45,17 +45,17 @@ struct YouTubePlayerView: NSViewRepresentable {
         webView.uiDelegate = context.coordinator
         webView.underPageBackgroundColor = .black
         load(webView, coordinator: context.coordinator)
-        return webView
+        return PlayerContainerView(webView: webView)
     }
 
-    func updateNSView(_ webView: WKWebView, context: Context) {
+    func updateNSView(_ container: PlayerContainerView, context: Context) {
         if context.coordinator.loadedID != videoID {
-            load(webView, coordinator: context.coordinator)
+            load(container.webView, coordinator: context.coordinator)
         }
     }
 
-    static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
-        webView.loadHTMLString("", baseURL: nil)  // stop playback
+    static func dismantleNSView(_ container: PlayerContainerView, coordinator: Coordinator) {
+        container.webView.loadHTMLString("", baseURL: nil)  // stop playback
     }
 
     private func load(_ webView: WKWebView, coordinator: Coordinator) {
@@ -97,6 +97,38 @@ struct YouTubePlayerView: NSViewRepresentable {
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
             nil  // no new windows
+        }
+    }
+}
+
+/// Hosts the web view so that SwiftUI sizes the container, not the web view itself.
+///
+/// For element fullscreen, WebKit moves the web view into its own fullscreen window and resizes it
+/// there. If SwiftUI manages the web view directly, it keeps the size SwiftUI gave it and ends up in
+/// the bottom-left corner of the fullscreen window. As a plain subview with an autoresizing mask,
+/// WebKit can resize it freely, and it is put back into this container when fullscreen ends.
+final class PlayerContainerView: NSView {
+    let webView: WKWebView
+
+    init(webView: WKWebView) {
+        self.webView = webView
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.black.cgColor
+        webView.translatesAutoresizingMaskIntoConstraints = true
+        webView.autoresizingMask = [.width, .height]
+        webView.frame = bounds
+        addSubview(webView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layout() {
+        super.layout()
+        // Only while the web view is ours; during fullscreen it lives in WebKit's window.
+        if webView.superview === self {
+            webView.frame = bounds
         }
     }
 }
