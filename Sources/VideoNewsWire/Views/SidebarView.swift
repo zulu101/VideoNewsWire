@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SidebarView: View {
     @Environment(AppStore.self) private var store
@@ -8,8 +9,8 @@ struct SidebarView: View {
 
     @State private var prompt: FolderPrompt?
     @State private var folderName = ""
-    /// Zeile, über der gerade etwas per Drag & Drop schwebt (für die Hervorhebung).
-    @State private var dropTarget: String?
+    /// Ordner, der gerade gezogen wird (nur für die Anzeige der Einfüge-Linie).
+    @State private var draggedFolderID: UUID?
 
     /// Inhalt eines Drags in der Seitenleiste: Kanal oder Ordner.
     enum DragItem {
@@ -62,21 +63,21 @@ struct SidebarView: View {
                             insertChannels(items, folder: folder.id, at: index)
                         }
                     } label: {
-                        Label(folder.name, systemImage: "folder")
-                            .badge(count(.folder(folder.id)))
-                            .tag(SidebarSelection.folder(folder.id))
-                            .draggable("folder:\(folder.id.uuidString)")
-                            .dropDestination(for: String.self) { items, _ in
-                                dropOnFolder(items, folder: folder.id)
-                            } isTargeted: { highlight("folder:\(folder.id)", $0) }
-                            .background(dropHighlight("folder:\(folder.id)"))
-                            .contextMenu { folderMenu(folder) }
+                        FolderLabel(
+                            folder: folder,
+                            badge: count(.folder(folder.id)),
+                            isFolderDrag: { draggedFolderID != nil },
+                            onDragStart: { draggedFolderID = folder.id },
+                            onDrop: { payload, zone in handleFolderDrop(payload, zone: zone, target: folder.id) }
+                        )
+                        .tag(SidebarSelection.folder(folder.id))
+                        .contextMenu { folderMenu(folder) }
                     }
                 }
-                // Einfüge-Linie zwischen den Ordnern.
-                .dropDestination(for: String.self) { items, index in
-                    insertFolders(items, at: index)
-                }
+                // Bewusst KEIN `.dropDestination(for:action:)` mit Index auf dieser ForEach:
+                // SwiftUI stürzt bei Einfüge-Drops zwischen aufklappbaren Gruppen ab
+                // (OutlineListCoordinator.performDropInsertion). Ordner werden über
+                // FolderLabel mit eigener Einfüge-Linie sortiert.
 
                 ForEach(store.channels(inFolder: nil)) { channel in
                     channelRow(channel)
@@ -211,6 +212,7 @@ struct SidebarView: View {
 
     /// Kanäle an der Einfüge-Linie (Position `index` innerhalb der Gruppe) ablegen.
     private func insertChannels(_ items: [String], folder: UUID?, at index: Int) {
+        draggedFolderID = nil
         var position = index
         for case .channel(let id) in items.compactMap(DragItem.init) where store.channel(id) != nil {
             store.moveChannel(id, toFolder: folder, at: position)
@@ -218,35 +220,18 @@ struct SidebarView: View {
         }
     }
 
-    /// Ordner an der Einfüge-Linie ablegen.
-    private func insertFolders(_ items: [String], at index: Int) {
-        for case .folder(let id) in items.compactMap(DragItem.init) {
-            store.moveFolder(id, to: index)
+    /// Ablage auf einem Ordnernamen: Ordner davor/dahinter einsortieren, Kanal hineinlegen.
+    private func handleFolderDrop(_ payload: String, zone: FolderDropZone, target: UUID) {
+        draggedFolderID = nil
+        switch DragItem(payload) {
+        case .folder(let id)?:
+            guard let index = store.folders.firstIndex(where: { $0.id == target }) else { return }
+            store.moveFolder(id, to: zone == .below ? index + 1 : index)
+        case .channel(let id)? where store.channel(id) != nil:
+            store.moveChannel(id, toFolder: target)
+        default:
+            break
         }
-    }
-
-    /// Kanal direkt auf den Ordnernamen gezogen: hinein, ans Ende.
-    private func dropOnFolder(_ items: [String], folder: UUID) -> Bool {
-        var handled = false
-        for case .channel(let id) in items.compactMap(DragItem.init) where store.channel(id) != nil {
-            store.moveChannel(id, toFolder: folder)
-            handled = true
-        }
-        return handled
-    }
-
-    private func highlight(_ key: String, _ isTargeted: Bool) {
-        if isTargeted {
-            dropTarget = key
-        } else if dropTarget == key {
-            dropTarget = nil
-        }
-    }
-
-    private func dropHighlight(_ key: String) -> some View {
-        RoundedRectangle(cornerRadius: 6)
-            .fill(Color.accentColor.opacity(dropTarget == key ? 0.22 : 0))
-            .padding(.horizontal, -4)
     }
 
     private func askForNewFolder(moving channelID: String? = nil) {
@@ -297,5 +282,110 @@ struct ChannelIcon: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
+    }
+}
+
+// MARK: - Ordner-Zeile mit eigener Drop-Logik
+
+enum FolderDropZone {
+    case none, above, inside, below
+}
+
+/// Ordnername in der Seitenleiste. Beim Ziehen eines Ordners zeigt eine Linie oberhalb oder
+/// unterhalb, wo er landet; beim Ziehen eines Kanals wird der Ordner hervorgehoben (hinein).
+private struct FolderLabel: View {
+    let folder: Folder
+    let badge: Int
+    let isFolderDrag: () -> Bool
+    let onDragStart: () -> Void
+    let onDrop: (String, FolderDropZone) -> Void
+
+    @State private var zone: FolderDropZone = .none
+    @State private var height: CGFloat = 24
+
+    var body: some View {
+        Label(folder.name, systemImage: "folder")
+            .badge(badge)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+            .onDrag {
+                onDragStart()
+                return NSItemProvider(object: "folder:\(folder.id.uuidString)" as NSString)
+            }
+            .onDrop(of: [.plainText, .utf8PlainText, .text], delegate: FolderDropDelegate(
+                height: height, isFolderDrag: isFolderDrag, zone: $zone, perform: onDrop
+            ))
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.accentColor.opacity(zone == .inside ? 0.22 : 0))
+                    .padding(.horizontal, -4)
+            )
+            .overlay(alignment: zone == .below ? .bottom : .top) {
+                if zone == .above || zone == .below {
+                    InsertionLine()
+                        .offset(y: zone == .above ? -3 : 3)
+                }
+            }
+    }
+}
+
+/// Einfüge-Linie im Stil von macOS: Kreis links, durchgehende Linie in Akzentfarbe.
+private struct InsertionLine: View {
+    var body: some View {
+        HStack(spacing: 0) {
+            Circle()
+                .strokeBorder(Color.accentColor, lineWidth: 2)
+                .frame(width: 7, height: 7)
+            Rectangle()
+                .fill(Color.accentColor)
+                .frame(height: 2)
+        }
+        .frame(height: 7)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct FolderDropDelegate: DropDelegate {
+    let height: CGFloat
+    let isFolderDrag: () -> Bool
+    @Binding var zone: FolderDropZone
+    let perform: (String, FolderDropZone) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.plainText, .utf8PlainText, .text])
+    }
+
+    func dropEntered(info: DropInfo) {
+        update(info)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        update(info)
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        zone = .none
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let finalZone = zone
+        zone = .none
+        guard let provider = info.itemProviders(for: [.plainText, .utf8PlainText, .text]).first else { return false }
+        _ = provider.loadTransferable(type: String.self) { result in
+            guard case .success(let payload) = result else { return }
+            DispatchQueue.main.async { perform(payload, finalZone) }
+        }
+        return true
+    }
+
+    /// Ordner: obere Hälfte = davor, untere Hälfte = dahinter. Kanal: hinein.
+    private func update(_ info: DropInfo) {
+        if isFolderDrag() {
+            zone = info.location.y < height / 2 ? .above : .below
+        } else {
+            zone = .inside
+        }
     }
 }
